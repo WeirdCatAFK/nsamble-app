@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { projects, conversations, files as filesApi } from "../api/client";
 import "./Chat.css";
 
-export default function Chat({ projectId, onProjectCreated, onFilesUpdated, onViewFile }) {
+export default function Chat({ projectId, onProjectCreated, onFilesUpdated, onViewFile, user, onLogout, onBack }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
@@ -82,8 +82,18 @@ export default function Chat({ projectId, onProjectCreated, onFilesUpdated, onVi
   return (
     <>
       <div className="panel-header">
-        <span className="label">Chat</span>
-        {projectId && <span className="project-tag">Project active</span>}
+        <span className="label">
+          {onBack && <button className="back-btn" onClick={onBack}>&larr;</button>}
+          Chat
+        </span>
+        <div className="chat-header-right">
+          {projectId && <span className="project-tag">Project active</span>}
+          {user && (
+            <button className="logout-btn" onClick={onLogout}>
+              Sign out
+            </button>
+          )}
+        </div>
       </div>
       <div className="panel-body chat-messages">
         {messages.length === 0 && (

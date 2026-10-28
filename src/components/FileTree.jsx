@@ -1,3 +1,4 @@
+import { files as filesApi } from "../api/client";
 import "./FileTree.css";
 
 const ICONS = {
@@ -60,6 +61,15 @@ export default function FileTree({ files, onSelect, activeFileId, projectId }) {
                 />
                 <span className="file-name">{file.filename}</span>
                 <span className="file-size">{formatSize(file.size)}</span>
+                <a
+                  className="file-download"
+                  href={filesApi.contentUrl(file.id)}
+                  download={file.filename}
+                  onClick={(e) => e.stopPropagation()}
+                  title="Download"
+                >
+                  &#x21E3;
+                </a>
               </button>
             ))}
           </div>

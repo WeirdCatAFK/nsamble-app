@@ -1,18 +1,17 @@
 import { Suspense, useMemo, useState, useEffect } from "react";
 import { Canvas } from "@react-three/fiber";
-import { OrbitControls, Grid, Center, Environment } from "@react-three/drei";
+import { OrbitControls, Grid, Center } from "@react-three/drei";
 import { STLLoader } from "three/examples/jsm/loaders/STLLoader.js";
-import * as THREE from "three";
 import { files as filesApi } from "../api/client";
 import "./Viewport.css";
 
-function StlModel({ url }) {
+const PART_COLORS = ["#4ec9b0", "#569cd6", "#dcdcaa", "#c586c0", "#ce9178", "#6a9955"];
+
+function StlModel({ url, color, offset }) {
   const [geometry, setGeometry] = useState(null);
-  const [error, setError] = useState(null);
 
   useEffect(() => {
     setGeometry(null);
-    setError(null);
     const loader = new STLLoader();
     loader.load(
       url,
@@ -21,30 +20,24 @@ function StlModel({ url }) {
         geo.center();
         setGeometry(geo);
       },
-      undefined,
-      () => setError("Failed to load STL"),
     );
     return () => setGeometry(null);
   }, [url]);
 
-  if (error) return null;
   if (!geometry) return null;
 
   return (
-    <Center>
-      <mesh geometry={geometry}>
-        <meshStandardMaterial
-          color="#4ec9b0"
-          metalness={0.3}
-          roughness={0.6}
-          flatShading={false}
-        />
-      </mesh>
-    </Center>
+    <mesh geometry={geometry} position={offset}>
+      <meshStandardMaterial
+        color={color}
+        metalness={0.3}
+        roughness={0.6}
+      />
+    </mesh>
   );
 }
 
-function SceneContent({ fileUrl }) {
+function SceneContent({ stlEntries }) {
   return (
     <>
       <ambientLight intensity={0.4} />
@@ -62,47 +55,78 @@ function SceneContent({ fileUrl }) {
         fadeDistance={50}
         infiniteGrid
       />
-      {fileUrl && (
+      <Center>
         <Suspense fallback={null}>
-          <StlModel url={fileUrl} />
+          {stlEntries.map((entry, i) => (
+            <StlModel
+              key={entry.id}
+              url={entry.url}
+              color={PART_COLORS[i % PART_COLORS.length]}
+              offset={stlEntries.length > 1 ? [i * 3, 0, 0] : [0, 0, 0]}
+            />
+          ))}
         </Suspense>
-      )}
+      </Center>
       <OrbitControls makeDefault enableDamping dampingFactor={0.1} />
     </>
   );
 }
 
-export default function Viewport({ file }) {
-  const fileUrl = useMemo(() => {
-    if (!file) return null;
+export default function Viewport({ file, allFiles }) {
+  const [showAll, setShowAll] = useState(false);
+
+  const stlFiles = useMemo(
+    () => (allFiles || []).filter((f) => f.filename?.toLowerCase().endsWith(".stl")),
+    [allFiles],
+  );
+
+  const stlEntries = useMemo(() => {
+    if (showAll && stlFiles.length > 0) {
+      return stlFiles.map((f) => ({ id: f.id, url: filesApi.contentUrl(f.id) }));
+    }
+    if (!file) return [];
     const ext = file.filename?.split(".").pop()?.toLowerCase();
-    if (ext !== "stl") return null;
-    return filesApi.contentUrl(file.id);
-  }, [file]);
+    if (ext !== "stl") return [];
+    return [{ id: file.id, url: filesApi.contentUrl(file.id) }];
+  }, [file, showAll, stlFiles]);
+
+  const label = showAll && stlFiles.length > 0
+    ? `${stlFiles.length} models`
+    : file?.filename || null;
 
   return (
     <>
       <div className="panel-header">
         <span className="label">Viewport</span>
-        {file && <span className="viewport-file">{file.filename}</span>}
+        <div className="viewport-controls">
+          {label && <span className="viewport-file">{label}</span>}
+          {stlFiles.length > 1 && (
+            <button
+              className="viewport-toggle"
+              onClick={() => setShowAll(!showAll)}
+            >
+              {showAll ? "Single" : "All"}
+            </button>
+          )}
+        </div>
       </div>
       <div className="viewport-canvas">
-        {!fileUrl && (
+        {stlEntries.length === 0 && (
           <div className="viewport-empty">
-            {file && !fileUrl
+            {file && !stlEntries.length
               ? `Cannot preview ${file.filename}`
               : "No model to display"}
           </div>
         )}
         <Canvas
           camera={{ position: [4, 3, 4], fov: 50 }}
-          style={{ display: fileUrl ? "block" : "none" }}
+          style={{ display: stlEntries.length > 0 ? "block" : "none" }}
           gl={{ antialias: true, alpha: false }}
           onCreated={({ gl }) => {
             gl.setClearColor("#1e1e1e");
           }}
         >
-          <SceneContent fileUrl={fileUrl} />
+          <SceneContent stlEntries={stlEntries} />
         </Canvas>
       </div>
     </>

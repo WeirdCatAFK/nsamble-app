@@ -27,3 +27,25 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+.viewport-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.viewport-toggle {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  color: var(--text-secondary);
+  font-size: 10px;
+  padding: 1px 6px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.viewport-toggle:hover {
+  color: var(--text-primary);
+  border-color: var(--text-muted);
+}

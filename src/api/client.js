@@ -40,6 +40,7 @@ export const auth = {
   register: (data) => json("POST", "/auth/register", data),
   login: (data) => json("POST", "/auth/login", data),
   me: () => json("GET", "/auth/me"),
+  google: (credential) => json("POST", "/auth/google", { credential }),
 };
 
 export const projects = {
