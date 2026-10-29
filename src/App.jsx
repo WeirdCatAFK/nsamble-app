@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from "react";
-import { getToken, auth, setToken, files as filesApi } from "./api/client";
+import { getToken, auth, setToken, files as filesApi, parts as partsApi } from "./api/client";
 import Homepage from "./components/Homepage";
 import Chat from "./components/Chat";
 import FileTree from "./components/FileTree";
@@ -12,6 +12,7 @@ export default function App() {
   const [activeProject, setActiveProject] = useState(null);
   const [viewFile, setViewFile] = useState(null);
   const [projectFiles, setProjectFiles] = useState([]);
+  const [scannedNames, setScannedNames] = useState(new Set());
 
   useEffect(() => {
     if (!getToken()) return setReady(true);
@@ -33,7 +34,11 @@ export default function App() {
     setActiveProject(project);
     setProjectFiles([]);
     setViewFile(null);
+    setScannedNames(new Set());
     filesApi.list(project.id).then(setProjectFiles).catch(() => {});
+    partsApi.list(project.id).then((pts) => {
+      setScannedNames(new Set(pts.filter((p) => p.manufacturingMethod === "scanned").map((p) => p.name)));
+    }).catch(() => {});
   }, []);
 
   const backToHome = useCallback(() => {
@@ -87,7 +92,7 @@ export default function App() {
           />
         </div>
         <div className="panel panel-viewport">
-          <Viewport file={viewFile} allFiles={projectFiles} projectId={activeProject.id} />
+          <Viewport file={viewFile} allFiles={projectFiles} projectId={activeProject.id} scannedNames={scannedNames} />
         </div>
       </div>
     </div>

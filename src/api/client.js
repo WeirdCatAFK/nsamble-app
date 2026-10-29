@@ -130,6 +130,10 @@ export const files = {
   },
 };
 
+export const parts = {
+  list: (projectId) => json("GET", `/projects/${projectId}/parts`),
+};
+
 export const scans = {
   start: async (projectId, video, calibration) => {
     const form = new FormData();
