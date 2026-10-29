@@ -91,6 +91,22 @@
   flex-shrink: 0;
 }
 
+.chat-model-select {
+  background: var(--input-bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-secondary);
+  padding: 4px 8px;
+  font-size: 12px;
+  align-self: flex-end;
+  cursor: pointer;
+  outline: none;
+}
+
+.chat-model-select:focus {
+  border-color: var(--accent);
+}
+
 .chat-input {
   flex: 1;
   background: var(--input-bg);

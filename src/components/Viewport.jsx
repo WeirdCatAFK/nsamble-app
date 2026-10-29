@@ -72,27 +72,27 @@ function SceneContent({ stlEntries }) {
   );
 }
 
-export default function Viewport({ file, allFiles }) {
+export default function Viewport({ file, allFiles, projectId }) {
   const [showAll, setShowAll] = useState(false);
 
   const stlFiles = useMemo(
-    () => (allFiles || []).filter((f) => f.filename?.toLowerCase().endsWith(".stl")),
+    () => (allFiles || []).filter((f) => f.name?.toLowerCase().endsWith(".stl")),
     [allFiles],
   );
 
   const stlEntries = useMemo(() => {
     if (showAll && stlFiles.length > 0) {
-      return stlFiles.map((f) => ({ id: f.id, url: filesApi.contentUrl(f.id) }));
+      return stlFiles.map((f) => ({ id: f.id, url: filesApi.contentUrl(projectId, f.id) }));
     }
     if (!file) return [];
-    const ext = file.filename?.split(".").pop()?.toLowerCase();
+    const ext = file.name?.split(".").pop()?.toLowerCase();
     if (ext !== "stl") return [];
-    return [{ id: file.id, url: filesApi.contentUrl(file.id) }];
-  }, [file, showAll, stlFiles]);
+    return [{ id: file.id, url: filesApi.contentUrl(projectId, file.id) }];
+  }, [file, showAll, stlFiles, projectId]);
 
   const label = showAll && stlFiles.length > 0
     ? `${stlFiles.length} models`
-    : file?.filename || null;
+    : file?.name || null;
 
   return (
     <>
@@ -114,7 +114,7 @@ export default function Viewport({ file, allFiles }) {
         {stlEntries.length === 0 && (
           <div className="viewport-empty">
             {file && !stlEntries.length
-              ? `Cannot preview ${file.filename}`
+              ? `Cannot preview ${file.name}`
               : "No model to display"}
           </div>
         )}

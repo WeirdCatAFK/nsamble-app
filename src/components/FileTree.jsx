@@ -1,3 +1,4 @@
+import { useState, useRef } from "react";
 import { files as filesApi } from "../api/client";
 import "./FileTree.css";
 
@@ -23,10 +24,29 @@ function formatSize(bytes) {
   return (bytes / (1024 * 1024)).toFixed(1) + " MB";
 }
 
-export default function FileTree({ files, onSelect, activeFileId, projectId }) {
+export default function FileTree({ files, onSelect, activeFileId, projectId, onFilesUpdated }) {
+  const [uploading, setUploading] = useState(false);
+  const inputRef = useRef(null);
+
+  const handleUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file || !projectId) return;
+    setUploading(true);
+    try {
+      const isStl = file.name.toLowerCase().endsWith(".stl");
+      await filesApi.upload(projectId, file, { createPart: isStl });
+      const list = await filesApi.list(projectId);
+      onFilesUpdated?.(list);
+    } catch {
+    } finally {
+      setUploading(false);
+      if (inputRef.current) inputRef.current.value = "";
+    }
+  };
+
   const grouped = {};
   for (const file of files) {
-    const e = ext(file.filename) || "other";
+    const e = ext(file.name) || "other";
     if (!grouped[e]) grouped[e] = [];
     grouped[e].push(file);
   }
@@ -35,7 +55,22 @@ export default function FileTree({ files, onSelect, activeFileId, projectId }) {
     <>
       <div className="panel-header">
         <span className="label">Files</span>
-        {files.length > 0 && <span className="file-count">{files.length}</span>}
+        <div className="file-header-right">
+          {files.length > 0 && <span className="file-count">{files.length}</span>}
+          {projectId && (
+            <label className="upload-btn" title="Upload file">
+              {uploading ? "..." : "⇡"}
+              <input
+                ref={inputRef}
+                type="file"
+                accept=".stl,.obj,.scad"
+                onChange={handleUpload}
+                hidden
+                disabled={uploading}
+              />
+            </label>
+          )}
+        </div>
       </div>
       <div className="panel-body file-tree">
         {!projectId && (
@@ -56,15 +91,15 @@ export default function FileTree({ files, onSelect, activeFileId, projectId }) {
                 <span
                   className="file-icon"
                   dangerouslySetInnerHTML={{
-                    __html: ICONS[ext(file.filename)] || ICONS.default,
+                    __html: ICONS[ext(file.name)] || ICONS.default,
                   }}
                 />
-                <span className="file-name">{file.filename}</span>
+                <span className="file-name">{file.name}</span>
                 <span className="file-size">{formatSize(file.size)}</span>
                 <a
                   className="file-download"
-                  href={filesApi.contentUrl(file.id)}
-                  download={file.filename}
+                  href={filesApi.contentUrl(projectId, file.id)}
+                  download={file.name}
                   onClick={(e) => e.stopPropagation()}
                   title="Download"
                 >

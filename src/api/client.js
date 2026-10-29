@@ -47,17 +47,63 @@ export const projects = {
   create: (data) => json("POST", "/projects", data),
   list: () => json("GET", "/projects"),
   get: (id) => json("GET", `/projects/${id}`),
+  update: (id, data) => json("PATCH", `/projects/${id}`, data),
+};
+
+export const models = {
+  list: () => json("GET", "/models"),
 };
 
 export const conversations = {
-  start: (projectId) => json("POST", "/conversations", { projectId }),
-  send: (sessionId, content) =>
-    json("POST", `/conversations/${sessionId}/messages`, { content }),
-  messages: (sessionId) => json("GET", `/conversations/${sessionId}/messages`),
+  list: (projectId) =>
+    json("GET", `/projects/${projectId}/conversations`),
+  start: (projectId, modelSlug) =>
+    json("POST", `/projects/${projectId}/conversations`, { modelSlug }),
+  send: (projectId, sessionId, content) =>
+    json("POST", `/projects/${projectId}/conversations/${sessionId}/messages`, { message: content }),
+  messages: (projectId, sessionId) =>
+    json("GET", `/projects/${projectId}/conversations/${sessionId}/messages`),
 };
 
 export const files = {
-  list: (projectId) => json("GET", `/files?projectId=${projectId}`),
-  meta: (id) => json("GET", `/files/${id}`),
-  contentUrl: (id) => `${BASE}/files/${id}/content`,
+  list: (projectId) => json("GET", `/projects/${projectId}/files`),
+  meta: (projectId, id) => json("GET", `/projects/${projectId}/files/${id}`),
+  contentUrl: (projectId, id) => `${BASE}/projects/${projectId}/files/${id}/content`,
+  upload: async (projectId, file, opts) => {
+    const form = new FormData();
+    form.append("file", file);
+    const params = opts?.createPart ? "?createPart=true" : "";
+    const res = await fetch(`${BASE}/projects/${projectId}/files/upload${params}`, {
+      method: "POST",
+      headers: _token ? { Authorization: `Bearer ${_token}` } : {},
+      body: form,
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || `Upload failed: ${res.status}`);
+    }
+    return res.json();
+  },
+};
+
+export const scans = {
+  start: async (projectId, video, calibration) => {
+    const form = new FormData();
+    form.append("video", video);
+    if (calibration) form.append("calibration", calibration);
+    const res = await fetch(`${BASE}/projects/${projectId}/scans`, {
+      method: "POST",
+      headers: _token ? { Authorization: `Bearer ${_token}` } : {},
+      body: form,
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || `Scan failed: ${res.status}`);
+    }
+    return res.json();
+  },
+  status: (projectId, scanId) =>
+    json("GET", `/projects/${projectId}/scans/${scanId}`),
+  import: (projectId, scanId, name) =>
+    json("POST", `/projects/${projectId}/scans/${scanId}/import`, { name }),
 };

@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from "react";
-import { getToken, auth, setToken } from "./api/client";
+import { getToken, auth, setToken, files as filesApi } from "./api/client";
 import Homepage from "./components/Homepage";
 import Chat from "./components/Chat";
 import FileTree from "./components/FileTree";
@@ -33,6 +33,7 @@ export default function App() {
     setActiveProject(project);
     setProjectFiles([]);
     setViewFile(null);
+    filesApi.list(project.id).then(setProjectFiles).catch(() => {});
   }, []);
 
   const backToHome = useCallback(() => {
@@ -82,10 +83,11 @@ export default function App() {
             files={projectFiles}
             onSelect={setViewFile}
             activeFileId={viewFile?.id}
+            onFilesUpdated={onFilesUpdated}
           />
         </div>
         <div className="panel panel-viewport">
-          <Viewport file={viewFile} allFiles={projectFiles} />
+          <Viewport file={viewFile} allFiles={projectFiles} projectId={activeProject.id} />
         </div>
       </div>
     </div>
