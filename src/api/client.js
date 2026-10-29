@@ -61,6 +61,43 @@ export const conversations = {
     json("POST", `/projects/${projectId}/conversations`, { modelSlug }),
   send: (projectId, sessionId, content) =>
     json("POST", `/projects/${projectId}/conversations/${sessionId}/messages`, { message: content }),
+  stream: async (projectId, sessionId, content, onEvent, { signal } = {}) => {
+    const res = await fetch(`${BASE}/projects/${projectId}/conversations/${sessionId}/messages`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "text/event-stream",
+        ..._token ? { Authorization: `Bearer ${_token}` } : {},
+      },
+      body: JSON.stringify({ message: content }),
+      signal,
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || `Request failed: ${res.status}`);
+    }
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let result = null;
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop();
+      for (const line of lines) {
+        if (!line.startsWith("data: ")) continue;
+        const event = JSON.parse(line.slice(6));
+        if (event.type === "done") {
+          result = event;
+        } else {
+          onEvent(event);
+        }
+      }
+    }
+    return result;
+  },
   messages: (projectId, sessionId) =>
     json("GET", `/projects/${projectId}/conversations/${sessionId}/messages`),
 };
@@ -69,6 +106,13 @@ export const files = {
   list: (projectId) => json("GET", `/projects/${projectId}/files`),
   meta: (projectId, id) => json("GET", `/projects/${projectId}/files/${id}`),
   contentUrl: (projectId, id) => `${BASE}/projects/${projectId}/files/${id}/content`,
+  contentBlob: async (projectId, id) => {
+    const res = await fetch(`${BASE}/projects/${projectId}/files/${id}/content`, {
+      headers: _token ? { Authorization: `Bearer ${_token}` } : {},
+    });
+    if (!res.ok) throw new Error(`File fetch failed: ${res.status}`);
+    return URL.createObjectURL(await res.blob());
+  },
   upload: async (projectId, file, opts) => {
     const form = new FormData();
     form.append("file", file);

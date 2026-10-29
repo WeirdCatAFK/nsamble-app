@@ -96,15 +96,23 @@ export default function FileTree({ files, onSelect, activeFileId, projectId, onF
                 />
                 <span className="file-name">{file.name}</span>
                 <span className="file-size">{formatSize(file.size)}</span>
-                <a
+                <span
                   className="file-download"
-                  href={filesApi.contentUrl(projectId, file.id)}
-                  download={file.name}
-                  onClick={(e) => e.stopPropagation()}
+                  role="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    filesApi.contentBlob(projectId, file.id).then((url) => {
+                      const a = document.createElement("a");
+                      a.href = url;
+                      a.download = file.name;
+                      a.click();
+                      URL.revokeObjectURL(url);
+                    }).catch(() => {});
+                  }}
                   title="Download"
                 >
                   &#x21E3;
-                </a>
+                </span>
               </button>
             ))}
           </div>

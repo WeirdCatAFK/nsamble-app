@@ -1,6 +1,156 @@
 import { useState, useRef, useEffect, useCallback } from "react";
+import { marked } from "marked";
 import { projects, conversations, models, files as filesApi } from "../api/client";
 import "./Chat.css";
+
+marked.setOptions({ breaks: true, gfm: true });
+
+function renderMarkdown(text) {
+  return { __html: marked.parse(text || "") };
+}
+
+function ToolCallBlock({ call }) {
+  const hasArgs = call.args && Object.keys(call.args).length > 0;
+  const hasResult = call.result != null;
+  const failed = !!call.error;
+
+  return (
+    <details className="activity-call">
+      <summary className={`activity-call-header ${failed ? "failed" : ""}`}>
+        <span className="activity-call-icon">{failed ? "✗" : "✓"}</span>
+        <span className="activity-call-name">{call.name}</span>
+        {failed && <span className="activity-call-error-badge">error</span>}
+      </summary>
+      <div className="activity-call-body">
+        {hasArgs && (
+          <div className="activity-section">
+            <div className="activity-section-label">Input</div>
+            <pre className="activity-pre">{JSON.stringify(call.args, null, 2)}</pre>
+          </div>
+        )}
+        {hasResult && (
+          <div className="activity-section">
+            <div className="activity-section-label">Output</div>
+            <pre className="activity-pre">{typeof call.result === "string" ? call.result : JSON.stringify(call.result, null, 2)}</pre>
+          </div>
+        )}
+      </div>
+    </details>
+  );
+}
+
+function ActivityBlock({ msg }) {
+  const callCount = msg.calls?.length ?? 0;
+  const label = callCount === 1
+    ? msg.calls[0].name
+    : `${callCount} tool calls`;
+
+  return (
+    <div className="chat-msg chat-msg-activity">
+      <details className="activity-block" open={false}>
+        <summary className="activity-header">
+          <span className="activity-dot" />
+          <span className="activity-label">{label}</span>
+          {msg.reasoning && <span className="activity-has-reasoning" title="Has reasoning">R</span>}
+          <span className="activity-round">round {msg.round}</span>
+        </summary>
+        <div className="activity-body">
+          {msg.reasoning && (
+            <div className="activity-reasoning">
+              <div className="activity-section-label">Reasoning</div>
+              <div className="activity-reasoning-text">{msg.reasoning}</div>
+            </div>
+          )}
+          {(msg.calls || []).map((call, j) => (
+            <ToolCallBlock key={j} call={call} />
+          ))}
+        </div>
+      </details>
+    </div>
+  );
+}
+
+function LiveActivity({ calls }) {
+  return (
+    <div className="chat-msg chat-msg-activity live">
+      <div className="activity-block">
+        <div className="activity-header live-header">
+          <span className="activity-dot pulsing" />
+          {calls.map((c, i) => (
+            <span key={i} className="activity-live-chip">
+              <span className="activity-call-name">{c.name}</span>
+              {c.status === "running" && <span className="dot-pulse" />}
+              {c.status === "done" && <span className="activity-call-icon">{c.error ? "✗" : "✓"}</span>}
+            </span>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function QuestionsBlock({ questions, onSubmit, disabled }) {
+  const [answers, setAnswers] = useState(() =>
+    questions.map((q) => q.recommended || ""),
+  );
+  const [submitted, setSubmitted] = useState(false);
+  const locked = disabled || submitted;
+
+  const setAnswer = (idx, value) =>
+    setAnswers((prev) => prev.map((a, i) => (i === idx ? value : a)));
+
+  const handleSubmit = () => {
+    setSubmitted(true);
+    const lines = questions.map(
+      (q, i) => `${i + 1}. ${q.question}\n   ${answers[i] || "(no answer)"}`,
+    );
+    onSubmit(lines.join("\n\n"));
+  };
+
+  return (
+    <div className="chat-msg chat-msg-questions" onClick={(e) => e.stopPropagation()}>
+      <div className="chat-msg-label">nsamble</div>
+      <div className="questions-block">
+        {questions.map((q, i) => (
+          <div key={i} className="question-card">
+            <div className="question-text">{q.question}</div>
+            {q.options?.length > 0 && (
+              <div className="question-options">
+                {q.options.map((opt, j) => (
+                  <button
+                    key={j}
+                    type="button"
+                    className={`question-chip ${answers[i] === opt ? "selected" : ""}`}
+                    onClick={() => !locked && setAnswer(i, opt)}
+                    disabled={locked}
+                  >
+                    {opt}
+                  </button>
+                ))}
+              </div>
+            )}
+            <input
+              className="question-input"
+              value={answers[i]}
+              onChange={(e) => setAnswer(i, e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") e.preventDefault(); }}
+              placeholder={q.recommended ? `Recommended: ${q.recommended}` : "Your answer..."}
+              disabled={locked}
+            />
+          </div>
+        ))}
+        <button
+          type="button"
+          className="questions-submit"
+          onClick={handleSubmit}
+          disabled={locked}
+        >
+          Submit answers
+        </button>
+      </div>
+    </div>
+  );
+}
 
 export default function Chat({ projectId, onProjectCreated, onFilesUpdated, onViewFile, user, onLogout, onBack }) {
   const [messages, setMessages] = useState([]);
@@ -8,14 +158,16 @@ export default function Chat({ projectId, onProjectCreated, onFilesUpdated, onVi
   const [sending, setSending] = useState(false);
   const [sessionId, setSessionId] = useState(null);
   const [status, setStatus] = useState(null);
+  const [liveCalls, setLiveCalls] = useState([]);
   const [availableModels, setAvailableModels] = useState([]);
   const [modelSlug, setModelSlug] = useState("");
   const namedRef = useRef(false);
   const bottomRef = useRef(null);
+  const abortRef = useRef(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, status]);
+  }, [messages, status, liveCalls]);
 
   useEffect(() => {
     models.list().then((list) => {
@@ -36,9 +188,26 @@ export default function Chat({ projectId, onProjectCreated, onFilesUpdated, onVi
         if (latest.model?.slug) setModelSlug(latest.model.slug);
         const msgs = await conversations.messages(projectId, latest.id);
         if (cancelled) return;
-        const mapped = msgs
-          .filter((m) => m.role === "USER" || m.role === "ASSISTANT")
-          .map((m) => ({ role: m.role === "USER" ? "user" : "assistant", content: m.content?.text ?? m.content }));
+        const mapped = [];
+        for (const m of msgs) {
+          if (m.role === "USER") {
+            mapped.push({ role: "user", content: m.content?.text ?? "" });
+          } else if (m.role === "TOOL") {
+            const askCall = m.content?.calls?.find((c) => c.name === "ask_user");
+            if (askCall?.args?.questions) {
+              mapped.push({ role: "questions", questions: askCall.args.questions, answered: true });
+            } else {
+              mapped.push({
+                role: "activity",
+                round: m.content?.round ?? 0,
+                reasoning: m.content?.reasoning ?? null,
+                calls: m.content?.calls ?? [],
+              });
+            }
+          } else if (m.role === "ASSISTANT") {
+            mapped.push({ role: "assistant", content: m.content?.text ?? "" });
+          }
+        }
         if (mapped.length) {
           setMessages(mapped);
           namedRef.current = true;
@@ -68,31 +237,97 @@ export default function Chat({ projectId, onProjectCreated, onFilesUpdated, onVi
       onFilesUpdated(list);
       const stl = list.find((f) => f.name?.endsWith(".stl"));
       if (stl) onViewFile(stl);
-    } catch {
-    }
+    } catch {}
   }, [onFilesUpdated, onViewFile]);
 
-  const send = async () => {
-    const text = input.trim();
+  const stop = () => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+  };
+
+  const sendText = async (text) => {
     if (!text || sending) return;
 
     setInput("");
     setMessages((prev) => [...prev, { role: "user", content: text }]);
     setSending(true);
-    setStatus("Thinking...");
+    setStatus("Reasoning...");
+    setLiveCalls([]);
+
+    const controller = new AbortController();
+    abortRef.current = controller;
+    let currentRound = 0;
+    let pidCapture = null;
 
     try {
       const pid = await ensureProject();
+      pidCapture = pid;
       const sid = await ensureSession(pid);
-      const response = await conversations.send(pid, sid, text);
 
-      const assistantText =
-        response.text || response.output || response.content || JSON.stringify(response);
+      const onEvent = (event) => {
+        if (event.type === "status") {
+          setStatus(event.message);
+        } else if (event.type === "reasoning") {
+          setStatus("Thinking...");
+        } else if (event.type === "tool_start") {
+          if (event.round !== currentRound) {
+            if (currentRound > 0) setLiveCalls([]);
+            currentRound = event.round;
+          }
+          if (event.name === "ask_user") {
+            setStatus("Preparing questions...");
+          } else {
+            setStatus(`Running ${event.name}...`);
+          }
+          setLiveCalls((prev) => [...prev, { name: event.name, status: "running" }]);
+        } else if (event.type === "tool_end") {
+          setLiveCalls((prev) =>
+            prev.map((c) =>
+              c.name === event.name && c.status === "running"
+                ? { ...c, status: "done", error: event.error }
+                : c,
+            ),
+          );
+          if (event.name === "ask_user" && event.args?.questions) {
+            setMessages((prev) => [
+              ...prev,
+              { role: "questions", questions: event.args.questions, answered: false },
+            ]);
+          } else if (event.round !== undefined) {
+            setMessages((prev) => {
+              const last = prev[prev.length - 1];
+              if (last?.role === "activity" && last.round === event.round) {
+                return [
+                  ...prev.slice(0, -1),
+                  {
+                    ...last,
+                    calls: [...last.calls, { name: event.name, args: event.args, result: event.result, error: event.error }],
+                  },
+                ];
+              }
+              return [
+                ...prev,
+                {
+                  role: "activity",
+                  round: event.round,
+                  reasoning: event.reasoning ?? null,
+                  calls: [{ name: event.name, args: event.args, result: event.result, error: event.error }],
+                },
+              ];
+            });
+          }
+        } else if (event.type === "error") {
+          setMessages((prev) => [...prev, { role: "error", content: event.message }]);
+        }
+      };
 
-      setMessages((prev) => [
-        ...prev,
-        { role: "assistant", content: assistantText },
-      ]);
+      const result = await conversations.stream(pid, sid, text, onEvent, { signal: controller.signal });
+
+      setLiveCalls([]);
+      const assistantText = result?.text || "";
+      if (assistantText) {
+        setMessages((prev) => [...prev, { role: "assistant", content: assistantText }]);
+      }
       setStatus(null);
       if (!namedRef.current) {
         namedRef.current = true;
@@ -101,14 +336,28 @@ export default function Chat({ projectId, onProjectCreated, onFilesUpdated, onVi
       }
       await refreshFiles(pid);
     } catch (error) {
-      setMessages((prev) => [
-        ...prev,
-        { role: "error", content: error.message },
-      ]);
+      setLiveCalls([]);
+      if (error.name === "AbortError") {
+        setMessages((prev) => [...prev, { role: "error", content: "Stopped by user." }]);
+      } else {
+        setMessages((prev) => [...prev, { role: "error", content: error.message }]);
+      }
       setStatus(null);
     } finally {
+      abortRef.current = null;
       setSending(false);
     }
+  };
+
+  const send = () => sendText(input.trim());
+
+  const handleAnswers = (text) => {
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.role === "questions" && !m.answered ? { ...m, answered: true } : m,
+      ),
+    );
+    sendText(text);
   };
 
   const onKeyDown = (e) => {
@@ -135,22 +384,38 @@ export default function Chat({ projectId, onProjectCreated, onFilesUpdated, onVi
         </div>
       </div>
       <div className="panel-body chat-messages">
-        {messages.length === 0 && (
+        {messages.length === 0 && !sending && (
           <div className="chat-empty">
             <p>Describe what you want to build.</p>
             <p className="hint">
-              Try: "Design a rack-mountable MicroATX server casing with side ventilation"
+              Try: &quot;Design a rack-mountable MicroATX server casing with side ventilation&quot;
             </p>
           </div>
         )}
-        {messages.map((msg, i) => (
-          <div key={i} className={`chat-msg chat-msg-${msg.role}`}>
-            <div className="chat-msg-label">
-              {msg.role === "user" ? "You" : msg.role === "error" ? "Error" : "nsamble"}
+        {messages.map((msg, i) =>
+          msg.role === "activity" ? (
+            <ActivityBlock key={i} msg={msg} />
+          ) : msg.role === "questions" ? (
+            <QuestionsBlock
+              key={i}
+              questions={msg.questions}
+              onSubmit={handleAnswers}
+              disabled={msg.answered}
+            />
+          ) : (
+            <div key={i} className={`chat-msg chat-msg-${msg.role}`}>
+              <div className="chat-msg-label">
+                {msg.role === "user" ? "You" : msg.role === "error" ? "Error" : "nsamble"}
+              </div>
+              {msg.role === "assistant" ? (
+                <div className="chat-msg-text markdown" dangerouslySetInnerHTML={renderMarkdown(msg.content)} />
+              ) : (
+                <div className="chat-msg-text">{msg.content}</div>
+              )}
             </div>
-            <div className="chat-msg-text">{msg.content}</div>
-          </div>
-        ))}
+          ),
+        )}
+        {liveCalls.length > 0 && <LiveActivity calls={liveCalls} />}
         {status && (
           <div className="chat-status">
             <span className="dot-pulse" />
@@ -180,9 +445,13 @@ export default function Chat({ projectId, onProjectCreated, onFilesUpdated, onVi
           rows={1}
           disabled={sending}
         />
-        <button className="chat-send" onClick={send} disabled={sending || !input.trim()}>
-          Send
-        </button>
+        {sending ? (
+          <button className="chat-stop" onClick={stop}>Stop</button>
+        ) : (
+          <button className="chat-send" onClick={send} disabled={!input.trim()}>
+            Send
+          </button>
+        )}
       </div>
     </>
   );

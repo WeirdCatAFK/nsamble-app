@@ -7,22 +7,23 @@ import "./Viewport.css";
 
 const PART_COLORS = ["#4ec9b0", "#569cd6", "#dcdcaa", "#c586c0", "#ce9178", "#6a9955"];
 
-function StlModel({ url, color, offset }) {
+function StlModel({ projectId, fileId, color, offset }) {
   const [geometry, setGeometry] = useState(null);
 
   useEffect(() => {
     setGeometry(null);
-    const loader = new STLLoader();
-    loader.load(
-      url,
-      (geo) => {
+    let revoked = false;
+    filesApi.contentBlob(projectId, fileId).then((blobUrl) => {
+      const loader = new STLLoader();
+      loader.load(blobUrl, (geo) => {
         geo.computeVertexNormals();
         geo.center();
-        setGeometry(geo);
-      },
-    );
-    return () => setGeometry(null);
-  }, [url]);
+        if (!revoked) setGeometry(geo);
+        URL.revokeObjectURL(blobUrl);
+      });
+    }).catch(() => {});
+    return () => { revoked = true; };
+  }, [projectId, fileId]);
 
   if (!geometry) return null;
 
@@ -37,7 +38,7 @@ function StlModel({ url, color, offset }) {
   );
 }
 
-function SceneContent({ stlEntries }) {
+function SceneContent({ stlEntries, projectId }) {
   return (
     <>
       <ambientLight intensity={0.4} />
@@ -60,7 +61,8 @@ function SceneContent({ stlEntries }) {
           {stlEntries.map((entry, i) => (
             <StlModel
               key={entry.id}
-              url={entry.url}
+              projectId={projectId}
+              fileId={entry.id}
               color={PART_COLORS[i % PART_COLORS.length]}
               offset={stlEntries.length > 1 ? [i * 3, 0, 0] : [0, 0, 0]}
             />
@@ -82,13 +84,13 @@ export default function Viewport({ file, allFiles, projectId }) {
 
   const stlEntries = useMemo(() => {
     if (showAll && stlFiles.length > 0) {
-      return stlFiles.map((f) => ({ id: f.id, url: filesApi.contentUrl(projectId, f.id) }));
+      return stlFiles.map((f) => ({ id: f.id }));
     }
     if (!file) return [];
     const ext = file.name?.split(".").pop()?.toLowerCase();
     if (ext !== "stl") return [];
-    return [{ id: file.id, url: filesApi.contentUrl(projectId, file.id) }];
-  }, [file, showAll, stlFiles, projectId]);
+    return [{ id: file.id }];
+  }, [file, showAll, stlFiles]);
 
   const label = showAll && stlFiles.length > 0
     ? `${stlFiles.length} models`
@@ -126,7 +128,7 @@ export default function Viewport({ file, allFiles, projectId }) {
             gl.setClearColor("#1e1e1e");
           }}
         >
-          <SceneContent stlEntries={stlEntries} />
+          <SceneContent stlEntries={stlEntries} projectId={projectId} />
         </Canvas>
       </div>
     </>
