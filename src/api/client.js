@@ -1,6 +1,8 @@
 const BASE = "/api";
 
-let _token = localStorage.getItem("nsamble_token");
+const hasStorage = typeof localStorage !== "undefined";
+
+let _token = hasStorage ? localStorage.getItem("nsamble_token") : null;
 
 function headers() {
   const h = { "Content-Type": "application/json" };
@@ -28,8 +30,19 @@ async function json(method, path, body) {
 
 export function setToken(token) {
   _token = token;
+  if (!hasStorage) return;
   if (token) localStorage.setItem("nsamble_token", token);
   else localStorage.removeItem("nsamble_token");
+}
+
+export function toAttachmentRefs(uploadResults) {
+  return uploadResults.map((saved) => {
+    const id = saved?.file?.id ?? saved?.id;
+    if (typeof id !== "string" || id.length === 0) {
+      throw new Error("Upload response did not include a file id.");
+    }
+    return { fileId: id };
+  });
 }
 
 export function getToken() {
@@ -48,6 +61,7 @@ export const projects = {
   list: () => json("GET", "/projects"),
   get: (id) => json("GET", `/projects/${id}`),
   update: (id, data) => json("PATCH", `/projects/${id}`, data),
+  remove: (id) => json("DELETE", `/projects/${id}`),
 };
 
 export const models = {
@@ -59,9 +73,9 @@ export const conversations = {
     json("GET", `/projects/${projectId}/conversations`),
   start: (projectId, modelSlug) =>
     json("POST", `/projects/${projectId}/conversations`, { modelSlug }),
-  send: (projectId, sessionId, content) =>
-    json("POST", `/projects/${projectId}/conversations/${sessionId}/messages`, { message: content }),
-  stream: async (projectId, sessionId, content, onEvent, { signal } = {}) => {
+  send: (projectId, sessionId, content, attachments) =>
+    json("POST", `/projects/${projectId}/conversations/${sessionId}/messages`, { message: content, attachments }),
+  stream: async (projectId, sessionId, content, onEvent, { signal, attachments } = {}) => {
     const res = await fetch(`${BASE}/projects/${projectId}/conversations/${sessionId}/messages`, {
       method: "POST",
       headers: {
@@ -69,7 +83,7 @@ export const conversations = {
         Accept: "text/event-stream",
         ..._token ? { Authorization: `Bearer ${_token}` } : {},
       },
-      body: JSON.stringify({ message: content }),
+      body: JSON.stringify({ message: content, attachments }),
       signal,
     });
     if (!res.ok) {
@@ -103,6 +117,7 @@ export const conversations = {
 };
 
 export const files = {
+  listAll: (take) => json("GET", `/files?take=${take ?? 50}`),
   list: (projectId) => json("GET", `/projects/${projectId}/files`),
   meta: (projectId, id) => json("GET", `/projects/${projectId}/files/${id}`),
   contentUrl: (projectId, id) => `${BASE}/projects/${projectId}/files/${id}/content`,

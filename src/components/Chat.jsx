@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { marked } from "marked";
-import { projects, conversations, models, files as filesApi } from "../api/client";
+import { projects, conversations, models, files as filesApi, toAttachmentRefs } from "../api/client";
 import "./Chat.css";
 
 marked.setOptions({ breaks: true, gfm: true });
@@ -90,43 +90,75 @@ function LiveActivity({ calls }) {
 }
 
 function QuestionsBlock({ questions, onSubmit, disabled }) {
-  const [answers, setAnswers] = useState(() =>
-    questions.map((q) => q.recommended || ""),
-  );
+  const [answers, setAnswers] = useState(() => questions.map(() => ""));
   const [submitted, setSubmitted] = useState(false);
   const locked = disabled || submitted;
+  const answeredCount = answers.filter((a) => a.trim().length > 0).length;
+  const allAnswered = answeredCount === questions.length;
+  const hasRecommended = questions.some((q) => q.recommended);
 
   const setAnswer = (idx, value) =>
     setAnswers((prev) => prev.map((a, i) => (i === idx ? value : a)));
 
+  const fillAllSuggested = () => {
+    if (locked) return;
+    setAnswers(questions.map((q) => q.recommended || ""));
+  };
+
   const handleSubmit = () => {
+    if (locked || !allAnswered) return;
     setSubmitted(true);
     const lines = questions.map(
-      (q, i) => `${i + 1}. ${q.question}\n   ${answers[i] || "(no answer)"}`,
+      (q, i) => `${i + 1}. ${q.question}\n   ${answers[i]}`,
     );
     onSubmit(lines.join("\n\n"));
   };
 
   return (
     <div className="chat-msg chat-msg-questions" onClick={(e) => e.stopPropagation()}>
-      <div className="chat-msg-label">nsamble</div>
+      <div className="questions-head">
+        <div>
+          <div className="questions-title">Questions before generation</div>
+          <div className="questions-sub">
+            {locked ? "Answered" : `${answeredCount} of ${questions.length} answered`}
+          </div>
+        </div>
+        {!locked && hasRecommended && (
+          <button type="button" className="questions-fill" onClick={fillAllSuggested}>
+            Use all suggested
+          </button>
+        )}
+      </div>
       <div className="questions-block">
         {questions.map((q, i) => (
-          <div key={i} className="question-card">
-            <div className="question-text">{q.question}</div>
+          <div key={i} className={`question-card ${answers[i].trim() ? "done" : ""}`}>
+            <div className="question-head">
+              <span className="question-num">{i + 1}</span>
+              <span className="question-text">{q.question}</span>
+            </div>
             {(q.qualityPick || q.costPick) && (
               <div className="question-picks">
                 {q.qualityPick && (
-                  <button type="button" className="pick-card pick-quality" onClick={() => !locked && setAnswer(i, q.qualityPick.label)} disabled={locked}>
-                    <span className="pick-badge">Quality</span>
+                  <button
+                    type="button"
+                    className={`pick-card ${answers[i] === q.qualityPick.label ? "selected" : ""}`}
+                    onClick={() => !locked && setAnswer(i, q.qualityPick.label)}
+                    disabled={locked}
+                  >
+                    <span className="pick-badge pick-badge-quality">Quality</span>
                     <span className="pick-label">{q.qualityPick.label}</span>
                     {q.qualityPick.price && <span className="pick-price">{q.qualityPick.price}</span>}
                     <span className="pick-reason">{q.qualityPick.reason}</span>
                   </button>
                 )}
                 {q.costPick && (
-                  <button type="button" className="pick-card pick-cost" onClick={() => !locked && setAnswer(i, q.costPick.label)} disabled={locked}>
-                    <span className="pick-badge">Budget</span>
+                  <button
+                    type="button"
+                    className={`pick-card ${answers[i] === q.costPick.label ? "selected" : ""}`}
+                    onClick={() => !locked && setAnswer(i, q.costPick.label)}
+                    disabled={locked}
+                  >
+                    <span className="pick-badge pick-badge-budget">Budget</span>
                     <span className="pick-label">{q.costPick.label}</span>
                     {q.costPick.price && <span className="pick-price">{q.costPick.price}</span>}
                     <span className="pick-reason">{q.costPick.reason}</span>
@@ -149,30 +181,45 @@ function QuestionsBlock({ questions, onSubmit, disabled }) {
                 ))}
               </div>
             )}
+            {q.recommended && answers[i] !== q.recommended && (
+              <button
+                type="button"
+                className="question-suggest"
+                onClick={() => !locked && setAnswer(i, q.recommended)}
+                disabled={locked}
+              >
+                Suggested: {q.recommended}
+              </button>
+            )}
             <input
               className="question-input"
               value={answers[i]}
               onChange={(e) => setAnswer(i, e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter") e.preventDefault(); }}
-              placeholder={q.recommended ? `Recommended: ${q.recommended}` : "Your answer..."}
+              placeholder="Type your answer..."
               disabled={locked}
             />
           </div>
         ))}
-        <button
-          type="button"
-          className="questions-submit"
-          onClick={handleSubmit}
-          disabled={locked}
-        >
-          Submit answers
-        </button>
+        <div className="questions-foot">
+          <span className="questions-hint">
+            {locked ? "" : "Answer each question, then submit."}
+          </span>
+          <button
+            type="button"
+            className="questions-submit"
+            onClick={handleSubmit}
+            disabled={locked || !allAnswered}
+          >
+            Submit answers
+          </button>
+        </div>
       </div>
     </div>
   );
 }
 
-export default function Chat({ projectId, onProjectCreated, onFilesUpdated, onViewFile, user, onLogout, onBack }) {
+export default function Chat({ projectId, onProjectCreated, onFilesUpdated, user, onLogout, onBack }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
@@ -181,9 +228,11 @@ export default function Chat({ projectId, onProjectCreated, onFilesUpdated, onVi
   const [liveCalls, setLiveCalls] = useState([]);
   const [availableModels, setAvailableModels] = useState([]);
   const [modelSlug, setModelSlug] = useState("");
+  const [pending, setPending] = useState([]);
   const namedRef = useRef(false);
   const bottomRef = useRef(null);
   const abortRef = useRef(null);
+  const attachRef = useRef(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -211,7 +260,11 @@ export default function Chat({ projectId, onProjectCreated, onFilesUpdated, onVi
         const mapped = [];
         for (const m of msgs) {
           if (m.role === "USER") {
-            mapped.push({ role: "user", content: m.content?.text ?? "" });
+            mapped.push({
+              role: "user",
+              content: m.content?.text ?? "",
+              attachments: m.content?.attachments ?? [],
+            });
           } else if (m.role === "TOOL") {
             const askCall = m.content?.calls?.find((c) => c.name === "ask_user");
             if (askCall?.args?.questions) {
@@ -229,7 +282,25 @@ export default function Chat({ projectId, onProjectCreated, onFilesUpdated, onVi
           }
         }
         if (mapped.length) {
-          setMessages(mapped);
+          let lastUser = -1;
+          mapped.forEach((m, i) => { if (m.role === "user") lastUser = i; });
+          mapped.forEach((m, i) => {
+            if (m.role === "questions" && i > lastUser) m.answered = false;
+          });
+          const withUrls = await Promise.all(mapped.map(async (m) => {
+            if (m.role !== "user" || !m.attachments?.length) return m;
+            const resolved = await Promise.all(m.attachments.map(async (a) => {
+              try {
+                const url = await filesApi.contentBlob(projectId, a.fileId);
+                return { ...a, url };
+              } catch {
+                return a;
+              }
+            }));
+            return { ...m, attachments: resolved };
+          }));
+          if (cancelled) return;
+          setMessages(withUrls);
           namedRef.current = true;
         }
       } catch {}
@@ -255,21 +326,19 @@ export default function Chat({ projectId, onProjectCreated, onFilesUpdated, onVi
     try {
       const list = await filesApi.list(pid);
       onFilesUpdated(list);
-      const stl = list.find((f) => f.name?.endsWith(".stl"));
-      if (stl) onViewFile(stl);
     } catch {}
-  }, [onFilesUpdated, onViewFile]);
+  }, [onFilesUpdated]);
 
   const stop = () => {
     abortRef.current?.abort();
     abortRef.current = null;
   };
 
-  const sendText = async (text) => {
-    if (!text || sending) return;
+  const sendText = async (text, uploads = []) => {
+    if ((!text && uploads.length === 0) || sending) return;
 
     setInput("");
-    setMessages((prev) => [...prev, { role: "user", content: text }]);
+    setMessages((prev) => [...prev, { role: "user", content: text, attachments: uploads }]);
     setSending(true);
     setStatus("Reasoning...");
     setLiveCalls([]);
@@ -345,7 +414,10 @@ export default function Chat({ projectId, onProjectCreated, onFilesUpdated, onVi
         }
       };
 
-      const result = await conversations.stream(pid, sid, text, onEvent, { signal: controller.signal });
+      const result = await conversations.stream(pid, sid, text, onEvent, {
+        signal: controller.signal,
+        attachments: uploads.map((u) => ({ fileId: u.fileId })),
+      });
 
       setLiveCalls([]);
       const assistantText = result?.text || "";
@@ -355,7 +427,8 @@ export default function Chat({ projectId, onProjectCreated, onFilesUpdated, onVi
       setStatus(null);
       if (!namedRef.current) {
         namedRef.current = true;
-        const title = text.length > 60 ? text.slice(0, 57) + "..." : text;
+        const source = text || "Image message";
+        const title = source.length > 60 ? source.slice(0, 57) + "..." : source;
         projects.update(pid, { name: title }).catch(() => {});
       }
       await refreshFiles(pid);
@@ -373,7 +446,59 @@ export default function Chat({ projectId, onProjectCreated, onFilesUpdated, onVi
     }
   };
 
-  const send = () => sendText(input.trim());
+  const send = async () => {
+    const text = input.trim();
+    if ((!text && pending.length === 0) || sending) return;
+    if (pending.length === 0) {
+      sendText(text);
+      return;
+    }
+    setStatus("Uploading images...");
+    try {
+      const pid = await ensureProject();
+      const items = [...pending];
+      const savedList = [];
+      for (const item of items) {
+        savedList.push(await filesApi.upload(pid, item.file));
+      }
+      const uploads = toAttachmentRefs(savedList).map((ref, i) => ({
+        ...ref,
+        name: items[i].file.name,
+        url: items[i].url,
+      }));
+      setPending([]);
+      await refreshFiles(pid);
+      sendText(text, uploads);
+    } catch (error) {
+      setStatus(null);
+      setMessages((prev) => [...prev, { role: "error", content: error.message }]);
+    }
+  };
+
+  const pickImages = (e) => {
+    const picked = [...(e.target.files || [])].filter((f) => f.type.startsWith("image/"));
+    if (attachRef.current) attachRef.current.value = "";
+    if (picked.length === 0) return;
+    setPending((prev) => {
+      const room = Math.max(0, 4 - prev.length);
+      return [
+        ...prev,
+        ...picked.slice(0, room).map((file, i) => ({
+          id: `${Date.now()}-${prev.length + i}-${file.name}`,
+          file,
+          url: URL.createObjectURL(file),
+        })),
+      ];
+    });
+  };
+
+  const removePending = (id) => {
+    setPending((prev) => {
+      const target = prev.find((p) => p.id === id);
+      if (target) URL.revokeObjectURL(target.url);
+      return prev.filter((p) => p.id !== id);
+    });
+  };
 
   const handleAnswers = (text) => {
     setMessages((prev) =>
@@ -434,7 +559,18 @@ export default function Chat({ projectId, onProjectCreated, onFilesUpdated, onVi
               {msg.role === "assistant" ? (
                 <div className="chat-msg-text markdown" dangerouslySetInnerHTML={renderMarkdown(msg.content)} />
               ) : (
-                <div className="chat-msg-text">{msg.content}</div>
+                <div className="chat-msg-text">
+                  {msg.attachments?.length > 0 && (
+                    <div className="chat-msg-images">
+                      {msg.attachments.map((a) => (
+                        a.url
+                          ? <img key={a.fileId || a.id} src={a.url} alt={a.name || ""} className="chat-msg-img" />
+                          : <span key={a.fileId || a.id} className="chat-msg-img-missing">{a.name || "image"}</span>
+                      ))}
+                    </div>
+                  )}
+                  {msg.content}
+                </div>
               )}
             </div>
           ),
@@ -449,33 +585,75 @@ export default function Chat({ projectId, onProjectCreated, onFilesUpdated, onVi
         <div ref={bottomRef} />
       </div>
       <div className="chat-input-bar">
-        {availableModels.length > 1 && !sessionId && (
-          <select
-            className="chat-model-select"
-            value={modelSlug}
-            onChange={(e) => setModelSlug(e.target.value)}
-          >
-            {availableModels.map((m) => (
-              <option key={m.slug} value={m.slug}>{m.slug}</option>
-            ))}
-          </select>
-        )}
-        <textarea
-          className="chat-input"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={onKeyDown}
-          placeholder="Describe a part or assembly..."
-          rows={1}
-          disabled={sending}
-        />
-        {sending ? (
-          <button className="chat-stop" onClick={stop}>Stop</button>
-        ) : (
-          <button className="chat-send" onClick={send} disabled={!input.trim()}>
-            Send
-          </button>
-        )}
+        <div className="chat-composer">
+          {pending.length > 0 && (
+            <div className="chat-pending">
+              {pending.map((p) => (
+                <div key={p.id} className="chat-pending-item">
+                  <img src={p.url} alt={p.file.name} className="chat-pending-img" />
+                  <button
+                    type="button"
+                    className="chat-pending-remove"
+                    onClick={() => removePending(p.id)}
+                    disabled={sending}
+                    title="Remove"
+                  >
+                    &times;
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          <textarea
+            className="chat-input"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={onKeyDown}
+            placeholder="Describe a part or assembly..."
+            rows={1}
+            disabled={sending}
+          />
+          <div className="chat-composer-row">
+            <div className="chat-composer-left">
+              <button
+                type="button"
+                className="chat-attach"
+                onClick={() => attachRef.current?.click()}
+                disabled={sending}
+                title="Attach images"
+              >
+                +
+              </button>
+              <input
+                ref={attachRef}
+                type="file"
+                accept="image/*"
+                multiple
+                hidden
+                onChange={pickImages}
+                disabled={sending}
+              />
+              {availableModels.length > 1 && !sessionId && (
+                <select
+                  className="chat-model-select"
+                  value={modelSlug}
+                  onChange={(e) => setModelSlug(e.target.value)}
+                >
+                  {availableModels.map((m) => (
+                    <option key={m.slug} value={m.slug}>{m.slug}</option>
+                  ))}
+                </select>
+              )}
+            </div>
+            {sending ? (
+              <button className="chat-stop" onClick={stop} title="Stop">&#x25A0;</button>
+            ) : (
+              <button className="chat-send" onClick={send} disabled={!input.trim() && pending.length === 0} title="Send">
+                &uarr;
+              </button>
+            )}
+          </div>
+        </div>
       </div>
     </>
   );
