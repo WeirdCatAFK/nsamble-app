@@ -4,12 +4,10 @@ import { OrbitControls, Grid, Center, Html } from "@react-three/drei";
 import { STLLoader } from "three/examples/jsm/loaders/STLLoader.js";
 import { marked } from "marked";
 import { files as filesApi } from "../api/client";
+import { baseName, isImageFile, isTextFile } from "../utils/preview";
 import "./Viewport.css";
 
-const TEXT_EXTENSIONS = new Set(["scad", "json", "md", "txt", "kicad_sch", "kicad_pcb", "ino", "ini", "cpp"]);
-const IMAGE_EXTENSIONS = new Set(["svg", "png"]);
-
-const PART_COLORS = ["#4ec9b0", "#569cd6", "#dcdcaa", "#c586c0", "#ce9178", "#6a9955"];
+const PART_COLORS = ["#BB792A", "#A6A78F", "#C05A2E", "#858B91", "#2E8B78", "#D8D5C0"];
 
 function StlModel({ projectId, fileId, color, offset, scanned, name, material, method, selected, onSelect }) {
   const [geometry, setGeometry] = useState(null);
@@ -41,7 +39,7 @@ function StlModel({ projectId, fileId, color, offset, scanned, name, material, m
       onClick={(e) => { e.stopPropagation(); onSelect?.(selected ? null : fileId); }}
     >
       <meshStandardMaterial
-        color={scanned ? "#888888" : color}
+        color={scanned ? "#858B91" : color}
         metalness={scanned ? 0.1 : 0.3}
         roughness={scanned ? 0.8 : 0.6}
         transparent={scanned || hovered}
@@ -73,10 +71,10 @@ function SceneContent({ stlEntries, projectId, selectedId, onSelect }) {
         args={[100, 100]}
         cellSize={1}
         cellThickness={0.5}
-        cellColor="#3e3e42"
+        cellColor="#2A3138"
         sectionSize={10}
         sectionThickness={1}
-        sectionColor="#4a4a4f"
+        sectionColor="#3A4147"
         fadeDistance={50}
         infiniteGrid
       />
@@ -104,7 +102,7 @@ function SceneContent({ stlEntries, projectId, selectedId, onSelect }) {
   );
 }
 
-export default function Viewport({ file, allFiles, projectId, scannedNames, parts, assemblyManifest }) {
+export default function Viewport({ file, allFiles, projectId, scannedNames, parts, assemblyManifest, tabs, onTabSelect, onTabClose }) {
   const [showAll, setShowAll] = useState(false);
   const [textContent, setTextContent] = useState(null);
   const [imageSrc, setImageSrc] = useState(null);
@@ -112,28 +110,28 @@ export default function Viewport({ file, allFiles, projectId, scannedNames, part
   const [currentStep, setCurrentStep] = useState(1);
 
   const fileExt = file?.name?.split(".").pop()?.toLowerCase();
-  const isTextFile = fileExt && TEXT_EXTENSIONS.has(fileExt);
-  const isImageFile = fileExt && IMAGE_EXTENSIONS.has(fileExt);
+  const showText = fileExt && isTextFile(file.name);
+  const showImage = fileExt && isImageFile(file.name);
 
   useEffect(() => {
     setTextContent(null);
-    if (!isTextFile || !file || !projectId) return;
+    if (!showText || !file || !projectId) return;
     let cancelled = false;
     filesApi.contentText(projectId, file.id).then((text) => {
       if (!cancelled) setTextContent(text);
     }).catch(() => {});
     return () => { cancelled = true; };
-  }, [file?.id, isTextFile, projectId]);
+  }, [file?.id, showText, projectId]);
 
   useEffect(() => {
     setImageSrc(null);
-    if (!isImageFile || !file || !projectId) return;
+    if (!showImage || !file || !projectId) return;
     let cancelled = false;
     filesApi.contentBlob(projectId, file.id).then((blobUrl) => {
       if (!cancelled) setImageSrc(blobUrl);
     }).catch(() => {});
     return () => { cancelled = true; };
-  }, [file?.id, isImageFile, projectId]);
+  }, [file?.id, showImage, projectId]);
 
   const stlFiles = useMemo(
     () => (allFiles || []).filter((f) => f.name?.toLowerCase().endsWith(".stl")),
@@ -208,28 +206,53 @@ export default function Viewport({ file, allFiles, projectId, scannedNames, part
           )}
         </div>
       </div>
+      {tabs?.length > 0 && (
+        <div className="viewport-tabs">
+          {tabs.map((t) => (
+            <div
+              key={t.id}
+              className={`viewport-tab ${t.id === file?.id ? "active" : ""}`}
+              onClick={() => onTabSelect?.(t)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => { if (e.key === "Enter") onTabSelect?.(t); }}
+              title={t.name}
+            >
+              <span className="viewport-tab-name">{baseName(t.name)}</span>
+              <span
+                className="viewport-tab-close"
+                role="button"
+                title="Close"
+                onClick={(e) => { e.stopPropagation(); onTabClose?.(t.id); }}
+              >
+                &times;
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
       <div className="viewport-canvas">
-        {isTextFile && textContent !== null ? (
+        {showText && textContent !== null ? (
           fileExt === "md" ? (
             <div className="md-preview" dangerouslySetInnerHTML={{ __html: marked.parse(textContent) }} />
           ) : (
             <pre className="text-preview">{textContent}</pre>
           )
-        ) : isImageFile && imageSrc ? (
-          <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100%", padding: "1rem", background: "#1e1e1e" }}>
+        ) : showImage && imageSrc ? (
+          <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100%", padding: "1rem", background: "#171A1D" }}>
             <img src={imageSrc} alt={file?.name || ""} style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} />
           </div>
-        ) : stlEntries.length === 0 && !isImageFile ? (
+        ) : stlEntries.length === 0 && !showImage ? (
           <div className="viewport-empty">
             {file ? `Cannot preview ${file.name}` : "No model to display"}
           </div>
         ) : null}
         <Canvas
           camera={{ position: [4, 3, 4], fov: 50 }}
-          style={{ display: stlEntries.length > 0 && !isTextFile && !isImageFile ? "block" : "none" }}
+          style={{ display: stlEntries.length > 0 && !showText && !showImage ? "block" : "none" }}
           gl={{ antialias: true, alpha: false }}
           onCreated={({ gl }) => {
-            gl.setClearColor("#1e1e1e");
+            gl.setClearColor("#171A1D");
           }}
         >
           <SceneContent stlEntries={stlEntries} projectId={projectId} selectedId={selectedId} onSelect={setSelectedId} />

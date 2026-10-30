@@ -50,6 +50,65 @@
   border-color: var(--text-muted);
 }
 
+/* --- File tabs --- */
+
+.viewport-tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  flex-shrink: 0;
+}
+
+.viewport-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 6px 3px 10px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 6px 6px 0 0;
+  border-bottom: none;
+  font-size: 11px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+  max-width: 180px;
+  outline: none;
+  user-select: none;
+}
+
+.viewport-tab:hover {
+  color: var(--text-primary);
+}
+
+.viewport-tab.active {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  border-color: var(--accent);
+}
+
+.viewport-tab-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.viewport-tab-close {
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1;
+  padding: 0 2px;
+  border-radius: 3px;
+}
+
+.viewport-tab-close:hover {
+  color: var(--error-text);
+  background: var(--bg-primary);
+}
+
 /* --- Text / code preview --- */
 
 .text-preview {
@@ -119,7 +178,7 @@
 /* --- 3D part tooltip --- */
 
 .viewport-tooltip {
-  background: rgba(30, 30, 30, 0.92);
+  background: rgba(23, 26, 29, 0.94);
   border: 1px solid var(--border);
   border-radius: 6px;
   padding: 6px 10px;
@@ -128,17 +187,17 @@
   gap: 2px;
   white-space: nowrap;
   font-size: 11px;
-  color: #e0e0e0;
+  color: var(--text-primary);
   pointer-events: none;
 }
 
 .viewport-tooltip strong {
   font-size: 12px;
-  color: #fff;
+  color: var(--text-primary);
 }
 
 .viewport-tooltip span {
-  color: #aaa;
+  color: var(--text-secondary);
 }
 
 /* --- Assembly step controls --- */

@@ -4,6 +4,7 @@ import Homepage from "./components/Homepage";
 import Chat from "./components/Chat";
 import FileTree from "./components/FileTree";
 import Viewport from "./components/Viewport";
+import { isPreviewable } from "./utils/preview";
 import "./App.css";
 
 export default function App() {
@@ -11,6 +12,7 @@ export default function App() {
   const [ready, setReady] = useState(false);
   const [activeProject, setActiveProject] = useState(null);
   const [viewFile, setViewFile] = useState(null);
+  const [openTabs, setOpenTabs] = useState([]);
   const [projectFiles, setProjectFiles] = useState([]);
   const [scannedNames, setScannedNames] = useState(new Set());
   const [partsData, setPartsData] = useState([]);
@@ -36,6 +38,7 @@ export default function App() {
     setActiveProject(project);
     setProjectFiles([]);
     setViewFile(null);
+    setOpenTabs([]);
     setScannedNames(new Set());
     filesApi.list(project.id).then(setProjectFiles).catch(() => {});
     partsApi.list(project.id).then((pts) => {
@@ -48,11 +51,41 @@ export default function App() {
     setActiveProject(null);
     setProjectFiles([]);
     setViewFile(null);
+    setOpenTabs([]);
   }, []);
 
+  const selectFile = useCallback((file) => {
+    if (!file) {
+      setViewFile(null);
+      return;
+    }
+    setOpenTabs((prev) => (prev.some((t) => t.id === file.id) ? prev : [...prev, file]));
+    setViewFile(file);
+  }, []);
+
+  const closeTab = useCallback((id) => {
+    setOpenTabs((prev) => prev.filter((t) => t.id !== id));
+    setViewFile((current) => {
+      if (!current || current.id !== id) return current;
+      const rest = openTabs.filter((t) => t.id !== id);
+      return rest.length > 0 ? rest[rest.length - 1] : null;
+    });
+  }, [openTabs]);
+
   const onFilesUpdated = useCallback((files) => {
-    setProjectFiles(files);
-    const manifest = files.find((f) => f.name === "assembly-manifest.json");
+    setProjectFiles((prev) => {
+      const known = new Set(prev.map((f) => f.id));
+      const fresh = files.filter((f) => !known.has(f.id));
+      if (fresh.length > 0) {
+        const next = fresh.find((f) => isPreviewable(f.name)) || fresh[0];
+        setOpenTabs((tabs) => (tabs.some((t) => t.id === next.id) ? tabs : [...tabs, next]));
+        setViewFile(next);
+      }
+      return files;
+    });
+    const manifest = files.find(
+      (f) => f.name === "assembly-manifest.json" || f.name?.endsWith("/assembly-manifest.json"),
+    );
     if (manifest && activeProject) {
       filesApi.contentText(activeProject.id, manifest.id)
         .then((text) => setAssemblyManifest(JSON.parse(text)))
@@ -61,10 +94,6 @@ export default function App() {
       setAssemblyManifest(null);
     }
   }, [activeProject]);
-
-  const onViewFileFromAI = useCallback((file) => {
-    setViewFile(file);
-  }, []);
 
   if (!ready) return null;
 
@@ -86,7 +115,6 @@ export default function App() {
           projectId={activeProject.id}
           onProjectCreated={(id) => setActiveProject((p) => ({ ...p, id }))}
           onFilesUpdated={onFilesUpdated}
-          onViewFile={onViewFileFromAI}
           user={user}
           onLogout={logout}
           onBack={backToHome}
@@ -97,13 +125,13 @@ export default function App() {
           <FileTree
             projectId={activeProject.id}
             files={projectFiles}
-            onSelect={setViewFile}
+            onSelect={selectFile}
             activeFileId={viewFile?.id}
             onFilesUpdated={onFilesUpdated}
           />
         </div>
         <div className="panel panel-viewport">
-          <Viewport file={viewFile} allFiles={projectFiles} projectId={activeProject.id} scannedNames={scannedNames} parts={partsData} assemblyManifest={assemblyManifest} />
+          <Viewport file={viewFile} allFiles={projectFiles} projectId={activeProject.id} scannedNames={scannedNames} parts={partsData} assemblyManifest={assemblyManifest} tabs={openTabs} onTabSelect={selectFile} onTabClose={closeTab} />
         </div>
       </div>
     </div>

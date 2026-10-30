@@ -23,6 +23,44 @@
   padding: 6px 12px 2px;
 }
 
+.folder-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px 5px 0;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--text-primary);
+  outline: none;
+  user-select: none;
+}
+
+.folder-row:hover {
+  background: var(--bg-tertiary);
+}
+
+.folder-toggle {
+  font-size: 9px;
+  color: var(--accent);
+  width: 12px;
+  flex-shrink: 0;
+}
+
+.folder-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.folder-count {
+  font-size: 10px;
+  color: var(--text-muted);
+  background: var(--bg-tertiary);
+  padding: 0 6px;
+  border-radius: 3px;
+}
+
 .file-row {
   display: flex;
   align-items: center;
