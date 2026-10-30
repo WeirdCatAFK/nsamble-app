@@ -12,6 +12,9 @@ const ICONS = {
   kicad_pcb: "&#x25A6;",
   gbr: "&#x25CE;",
   drl: "&#x25CE;",
+  ino: "&#x2699;",
+  ini: "&#x2699;",
+  cpp: "&#x2699;",
   default: "&#x25A1;",
 };
 
@@ -67,7 +70,7 @@ export default function FileTree({ files, onSelect, activeFileId, projectId, onF
               <input
                 ref={inputRef}
                 type="file"
-                accept=".stl,.obj,.scad,.kicad_sch,.kicad_pcb,.gbr"
+                accept=".stl,.obj,.scad,.kicad_sch,.kicad_pcb,.gbr,.ino"
                 onChange={handleUpload}
                 hidden
                 disabled={uploading}

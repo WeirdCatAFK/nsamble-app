@@ -6,7 +6,7 @@ import { marked } from "marked";
 import { files as filesApi } from "../api/client";
 import "./Viewport.css";
 
-const TEXT_EXTENSIONS = new Set(["scad", "json", "md", "txt", "kicad_sch", "kicad_pcb"]);
+const TEXT_EXTENSIONS = new Set(["scad", "json", "md", "txt", "kicad_sch", "kicad_pcb", "ino", "ini", "cpp"]);
 const IMAGE_EXTENSIONS = new Set(["svg", "png"]);
 
 const PART_COLORS = ["#4ec9b0", "#569cd6", "#dcdcaa", "#c586c0", "#ce9178", "#6a9955"];
