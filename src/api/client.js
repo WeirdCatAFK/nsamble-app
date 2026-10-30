@@ -113,6 +113,13 @@ export const files = {
     if (!res.ok) throw new Error(`File fetch failed: ${res.status}`);
     return URL.createObjectURL(await res.blob());
   },
+  contentText: async (projectId, id) => {
+    const res = await fetch(`${BASE}/projects/${projectId}/files/${id}/content`, {
+      headers: _token ? { Authorization: `Bearer ${_token}` } : {},
+    });
+    if (!res.ok) throw new Error(`File fetch failed: ${res.status}`);
+    return res.text();
+  },
   upload: async (projectId, file, opts) => {
     const form = new FormData();
     form.append("file", file);

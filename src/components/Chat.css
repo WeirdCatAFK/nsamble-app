@@ -592,3 +592,69 @@ details[open] > .activity-header::before {
   opacity: 0.4;
   cursor: default;
 }
+
+/* --- Quality / Cost pick cards --- */
+
+.question-picks {
+  display: flex;
+  gap: 8px;
+}
+
+.pick-card {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-top: 3px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-tertiary);
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  color: var(--text-primary);
+  transition: border-color 0.15s;
+}
+
+.pick-card:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+.pick-card:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.pick-quality {
+  border-top-color: #4ec9b0;
+}
+
+.pick-cost {
+  border-top-color: #569cd6;
+}
+
+.pick-badge {
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+}
+
+.pick-label {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.pick-price {
+  font-size: 12px;
+  color: var(--accent);
+  font-weight: 500;
+}
+
+.pick-reason {
+  font-size: 11px;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}

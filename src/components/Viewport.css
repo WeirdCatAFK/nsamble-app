@@ -49,3 +49,130 @@
   color: var(--text-primary);
   border-color: var(--text-muted);
 }
+
+/* --- Text / code preview --- */
+
+.text-preview {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  padding: 12px;
+  overflow: auto;
+  font-size: 12px;
+  font-family: monospace;
+  line-height: 1.5;
+  color: var(--text-primary);
+  background: var(--bg-primary);
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.md-preview {
+  position: absolute;
+  inset: 0;
+  padding: 12px;
+  overflow: auto;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-primary);
+  background: var(--bg-primary);
+}
+
+.md-preview h1, .md-preview h2, .md-preview h3 {
+  margin: 12px 0 6px;
+  font-weight: 600;
+}
+
+.md-preview table {
+  border-collapse: collapse;
+  font-size: 12px;
+  margin: 6px 0;
+}
+
+.md-preview th, .md-preview td {
+  border: 1px solid var(--border);
+  padding: 4px 8px;
+}
+
+.md-preview th {
+  background: var(--bg-tertiary);
+  font-weight: 600;
+}
+
+.md-preview code {
+  background: var(--bg-tertiary);
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 12px;
+  font-family: monospace;
+}
+
+.md-preview pre {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 8px;
+  overflow-x: auto;
+  font-size: 12px;
+}
+
+/* --- 3D part tooltip --- */
+
+.viewport-tooltip {
+  background: rgba(30, 30, 30, 0.92);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  white-space: nowrap;
+  font-size: 11px;
+  color: #e0e0e0;
+  pointer-events: none;
+}
+
+.viewport-tooltip strong {
+  font-size: 12px;
+  color: #fff;
+}
+
+.viewport-tooltip span {
+  color: #aaa;
+}
+
+/* --- Assembly step controls --- */
+
+.step-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.step-btn {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  color: var(--text-secondary);
+  font-size: 11px;
+  padding: 1px 6px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.step-btn:hover:not(:disabled) {
+  color: var(--text-primary);
+  border-color: var(--text-muted);
+}
+
+.step-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.step-counter {
+  font-size: 10px;
+  color: var(--text-secondary);
+  min-width: 70px;
+  text-align: center;
+}

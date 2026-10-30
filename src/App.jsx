@@ -13,6 +13,8 @@ export default function App() {
   const [viewFile, setViewFile] = useState(null);
   const [projectFiles, setProjectFiles] = useState([]);
   const [scannedNames, setScannedNames] = useState(new Set());
+  const [partsData, setPartsData] = useState([]);
+  const [assemblyManifest, setAssemblyManifest] = useState(null);
 
   useEffect(() => {
     if (!getToken()) return setReady(true);
@@ -37,6 +39,7 @@ export default function App() {
     setScannedNames(new Set());
     filesApi.list(project.id).then(setProjectFiles).catch(() => {});
     partsApi.list(project.id).then((pts) => {
+      setPartsData(pts);
       setScannedNames(new Set(pts.filter((p) => p.manufacturingMethod === "scanned").map((p) => p.name)));
     }).catch(() => {});
   }, []);
@@ -49,7 +52,15 @@ export default function App() {
 
   const onFilesUpdated = useCallback((files) => {
     setProjectFiles(files);
-  }, []);
+    const manifest = files.find((f) => f.name === "assembly-manifest.json");
+    if (manifest && activeProject) {
+      filesApi.contentText(activeProject.id, manifest.id)
+        .then((text) => setAssemblyManifest(JSON.parse(text)))
+        .catch(() => setAssemblyManifest(null));
+    } else {
+      setAssemblyManifest(null);
+    }
+  }, [activeProject]);
 
   const onViewFileFromAI = useCallback((file) => {
     setViewFile(file);
@@ -92,7 +103,7 @@ export default function App() {
           />
         </div>
         <div className="panel panel-viewport">
-          <Viewport file={viewFile} allFiles={projectFiles} projectId={activeProject.id} scannedNames={scannedNames} />
+          <Viewport file={viewFile} allFiles={projectFiles} projectId={activeProject.id} scannedNames={scannedNames} parts={partsData} assemblyManifest={assemblyManifest} />
         </div>
       </div>
     </div>

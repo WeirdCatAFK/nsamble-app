@@ -114,6 +114,26 @@ function QuestionsBlock({ questions, onSubmit, disabled }) {
         {questions.map((q, i) => (
           <div key={i} className="question-card">
             <div className="question-text">{q.question}</div>
+            {(q.qualityPick || q.costPick) && (
+              <div className="question-picks">
+                {q.qualityPick && (
+                  <button type="button" className="pick-card pick-quality" onClick={() => !locked && setAnswer(i, q.qualityPick.label)} disabled={locked}>
+                    <span className="pick-badge">Quality</span>
+                    <span className="pick-label">{q.qualityPick.label}</span>
+                    {q.qualityPick.price && <span className="pick-price">{q.qualityPick.price}</span>}
+                    <span className="pick-reason">{q.qualityPick.reason}</span>
+                  </button>
+                )}
+                {q.costPick && (
+                  <button type="button" className="pick-card pick-cost" onClick={() => !locked && setAnswer(i, q.costPick.label)} disabled={locked}>
+                    <span className="pick-badge">Budget</span>
+                    <span className="pick-label">{q.costPick.label}</span>
+                    {q.costPick.price && <span className="pick-price">{q.costPick.price}</span>}
+                    <span className="pick-reason">{q.costPick.reason}</span>
+                  </button>
+                )}
+              </div>
+            )}
             {q.options?.length > 0 && (
               <div className="question-options">
                 {q.options.map((opt, j) => (
