@@ -336,6 +336,10 @@ export default function Chat({ projectId, onProjectCreated, onFilesUpdated, onVi
               ];
             });
           }
+        } else if (event.type === "subagent_tool_start") {
+          setStatus(`${event.role}: Running ${event.name}...`);
+        } else if (event.type === "subagent_tool_end") {
+          setStatus(`${event.role}: ${event.name} ${event.error ? "failed" : "done"}`);
         } else if (event.type === "error") {
           setMessages((prev) => [...prev, { role: "error", content: event.message }]);
         }
