@@ -1,18 +1,21 @@
 :root {
-  --bg-primary: #1e1e1e;
-  --bg-secondary: #252526;
-  --bg-tertiary: #2d2d2d;
-  --border: #3e3e42;
-  --text-primary: #cccccc;
-  --text-secondary: #858585;
-  --text-muted: #5a5a5a;
-  --accent: #569cd6;
-  --accent-dim: #264f78;
-  --success: #4ec9b0;
-  --warning: #dcdcaa;
-  --error: #f44747;
-  --input-bg: #3c3c3c;
-  --scrollbar-thumb: #424242;
+  --bg-primary: #171A1D;
+  --bg-secondary: #252A2E;
+  --bg-tertiary: #2E3439;
+  --border: #3A4147;
+  --text-primary: #E6E8E5;
+  --text-secondary: #858B91;
+  --text-muted: #5C6267;
+  --accent: #BB792A;
+  --accent-dim: #114E45;
+  --brand: #114E45;
+  --sage: #A6A78F;
+  --success: #A6A78F;
+  --warning: #BB792A;
+  --error: #9B3C1B;
+  --error-text: #D97B4A;
+  --input-bg: #1F2429;
+  --scrollbar-thumb: #3A4147;
   --scrollbar-track: transparent;
 }
 
@@ -49,7 +52,7 @@ body {
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #555;
+  background: #4A5157;
 }
 
 input, textarea, button {
