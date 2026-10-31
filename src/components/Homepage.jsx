@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { auth, setToken, projects, conversations, files as filesApi } from "../api/client";
+import { auth, setToken, projects, conversations, files as filesApi, machines as machinesApi, users as usersApi } from "../api/client";
 import { templates } from "../data/templates";
+import { MACHINE_TYPES } from "../utils/machines";
+import MachineIcon from "./MachineIcon";
 import "./Homepage.css";
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
@@ -402,6 +404,145 @@ function AuthSection({ onAuth }) {
   );
 }
 
+function WorkshopSection() {
+  const [machines, setMachines] = useState([]);
+  const [typeId, setTypeId] = useState(MACHINE_TYPES[0].id);
+  const [customType, setCustomType] = useState("");
+  const [name, setName] = useState("");
+  const [notes, setNotes] = useState("");
+  const [materials, setMaterials] = useState("");
+  const [savedTick, setSavedTick] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    machinesApi.list().then(setMachines).catch(() => {});
+    usersApi.me().then((u) => setMaterials(u.preferredMaterials ?? "")).catch(() => {});
+  }, []);
+
+  const addMachine = async (e) => {
+    e.preventDefault();
+    const preset = MACHINE_TYPES.find((t) => t.id === typeId);
+    const type = typeId === "other" ? customType.trim() || "Other" : (preset?.label ?? "");
+    if (!type || !name.trim() || busy) return;
+    setBusy(true);
+    try {
+      const created = await machinesApi.create({
+        type,
+        name: name.trim(),
+        notes: notes.trim() ? notes.trim() : null,
+      });
+      setMachines((prev) => [...prev, created]);
+      setCustomType("");
+      setName("");
+      setNotes("");
+    } catch {
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const removeMachine = async (id) => {
+    const prev = machines;
+    setMachines(prev.filter((m) => m.id !== id));
+    try {
+      await machinesApi.remove(id);
+    } catch {
+      setMachines(prev);
+    }
+  };
+
+  const saveMaterials = async (e) => {
+    e.preventDefault();
+    if (busy) return;
+    setBusy(true);
+    try {
+      await usersApi.updateMe({ preferredMaterials: materials });
+      setSavedTick(true);
+      setTimeout(() => setSavedTick(false), 2000);
+    } catch {
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section className="homepage-section">
+      <h2 className="section-title">Your workshop</h2>
+      <p className="workshop-hint">Machines and materials the agent assumes for every project.</p>
+      {machines.length > 0 && (
+        <div className="machines-grid">
+          {machines.map((m) => (
+            <div key={m.id} className="machine-card">
+              <MachineIcon type={m.type} />
+              <div className="machine-main">
+                <div className="machine-name">{m.name}</div>
+                <div className="machine-type">{m.notes ? `${m.type} · ${m.notes}` : m.type}</div>
+              </div>
+              <button className="row-btn row-btn-danger" onClick={() => removeMachine(m.id)}>
+                Remove
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+      <form className="machine-form" onSubmit={addMachine}>
+        <select
+          className="machine-select"
+          value={typeId}
+          onChange={(e) => setTypeId(e.target.value)}
+          aria-label="Machine type"
+        >
+          {MACHINE_TYPES.map((t) => (
+            <option key={t.id} value={t.id}>{t.label}</option>
+          ))}
+        </select>
+        {typeId === "other" && (
+          <input
+            className="projects-search"
+            type="text"
+            placeholder="Machine type"
+            value={customType}
+            onChange={(e) => setCustomType(e.target.value)}
+          />
+        )}
+        <input
+          className="projects-search"
+          type="text"
+          placeholder="Name (e.g. K40)"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          required
+        />
+        <input
+          className="projects-search"
+          type="text"
+          placeholder="Notes (e.g. 40W, 300×200mm)"
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+        />
+        <button className="row-btn" type="submit" disabled={busy}>
+          {busy ? "..." : "Add machine"}
+        </button>
+      </form>
+      <form className="materials-row" onSubmit={saveMaterials}>
+        <label className="materials-label" htmlFor="workshop-materials">Preferred materials</label>
+        <input
+          id="workshop-materials"
+          className="projects-search materials-input"
+          type="text"
+          placeholder="MDF, PLA, ..."
+          value={materials}
+          onChange={(e) => setMaterials(e.target.value)}
+        />
+        <button className="row-btn" type="submit" disabled={busy}>
+          {busy ? "..." : "Save"}
+        </button>
+        {savedTick && <span className="materials-saved">Saved</span>}
+      </form>
+    </section>
+  );
+}
+
 export default function Homepage({ user, onAuth, onLogout, onOpenProject }) {
   const [userProjects, setUserProjects] = useState([]);
   const [userFiles, setUserFiles] = useState([]);
@@ -538,6 +679,8 @@ export default function Homepage({ user, onAuth, onLogout, onOpenProject }) {
           </div>
         </section>
       )}
+
+      {user && <WorkshopSection />}
 
       <section className="homepage-section">
         <h2 className="section-title">Templates</h2>

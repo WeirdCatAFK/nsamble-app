@@ -68,6 +68,17 @@ export const models = {
   list: () => json("GET", "/models"),
 };
 
+export const machines = {
+  list: () => json("GET", "/machines"),
+  create: (data) => json("POST", "/machines", data),
+  remove: (id) => json("DELETE", `/machines/${id}`),
+};
+
+export const users = {
+  me: () => json("GET", "/users/me"),
+  updateMe: (data) => json("PATCH", "/users/me", data),
+};
+
 export const conversations = {
   list: (projectId) =>
     json("GET", `/projects/${projectId}/conversations`),
