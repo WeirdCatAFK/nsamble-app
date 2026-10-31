@@ -2,7 +2,7 @@ import { Suspense, useMemo, useState, useEffect } from "react";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls, Grid, Center, Html } from "@react-three/drei";
 import { STLLoader } from "three/examples/jsm/loaders/STLLoader.js";
-import { marked } from "marked";
+import { renderMarkdown } from "../utils/markdown.js";
 import { files as filesApi } from "../api/client";
 import ImageViewer from "./ImageViewer";
 import { baseName, isImageFile, isTextFile } from "../utils/preview";
@@ -235,7 +235,7 @@ export default function Viewport({ file, allFiles, projectId, scannedNames, part
       <div className="viewport-canvas">
         {showText && textContent !== null ? (
           fileExt === "md" ? (
-            <div className="md-preview" dangerouslySetInnerHTML={{ __html: marked.parse(textContent) }} />
+            <div className="md-preview" dangerouslySetInnerHTML={renderMarkdown(textContent)} />
           ) : (
             <pre className="text-preview">{textContent}</pre>
           )

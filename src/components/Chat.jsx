@@ -1,16 +1,10 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { marked } from "marked";
+import { renderMarkdown } from "../utils/markdown.js";
 import { projects, conversations, models, files as filesApi, toAttachmentRefs } from "../api/client";
 import { canStartSession, resolveModelSlug } from "../utils/model-select.js";
 import { applyTextareaGrowth } from "../utils/textarea.js";
 import ModelSelector from "./ModelSelector";
 import "./Chat.css";
-
-marked.setOptions({ breaks: true, gfm: true });
-
-function renderMarkdown(text) {
-  return { __html: marked.parse(text || "") };
-}
 
 function ToolCallBlock({ call }) {
   const hasArgs = call.args && Object.keys(call.args).length > 0;
