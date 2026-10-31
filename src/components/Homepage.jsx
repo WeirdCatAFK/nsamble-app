@@ -635,6 +635,8 @@ export default function Homepage({ user, onAuth, onLogout, onOpenProject }) {
         )}
       </header>
 
+      {user && <WorkshopSection />}
+
       {user && userProjects.length > 0 && (
         <section className="homepage-section">
           <div className="projects-toolbar">
@@ -679,8 +681,6 @@ export default function Homepage({ user, onAuth, onLogout, onOpenProject }) {
           </div>
         </section>
       )}
-
-      {user && <WorkshopSection />}
 
       <section className="homepage-section">
         <h2 className="section-title">Templates</h2>
