@@ -4,6 +4,7 @@ import { OrbitControls, Grid, Center, Html } from "@react-three/drei";
 import { STLLoader } from "three/examples/jsm/loaders/STLLoader.js";
 import { marked } from "marked";
 import { files as filesApi } from "../api/client";
+import ImageViewer from "./ImageViewer";
 import { baseName, isImageFile, isTextFile } from "../utils/preview";
 import "./Viewport.css";
 
@@ -239,9 +240,7 @@ export default function Viewport({ file, allFiles, projectId, scannedNames, part
             <pre className="text-preview">{textContent}</pre>
           )
         ) : showImage && imageSrc ? (
-          <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100%", padding: "1rem", background: "#171A1D" }}>
-            <img src={imageSrc} alt={file?.name || ""} style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} />
-          </div>
+          <ImageViewer key={file?.id} src={imageSrc} alt={file?.name || ""} />
         ) : stlEntries.length === 0 && !showImage ? (
           <div className="viewport-empty">
             {file ? `Cannot preview ${file.name}` : "No model to display"}
