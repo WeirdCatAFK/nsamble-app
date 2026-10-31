@@ -1,0 +1,92 @@
+.image-viewer {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: var(--bg-primary);
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  outline: none;
+  cursor: grab;
+}
+
+.image-viewer.zoomed {
+  cursor: grabbing;
+}
+
+.image-viewer img {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  transform-origin: center center;
+  pointer-events: none;
+  -webkit-user-drag: none;
+}
+
+.image-viewer-controls {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(23, 26, 29, 0.85);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 3px;
+}
+
+.image-viewer-controls button {
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1;
+  min-width: 24px;
+  padding: 4px 6px;
+  cursor: pointer;
+  font-family: inherit;
+  touch-action: manipulation;
+}
+
+.image-viewer-controls button:hover:not(:disabled) {
+  color: var(--text-primary);
+  background: var(--bg-tertiary);
+}
+
+.image-viewer-controls button:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.image-viewer-controls .image-viewer-zoom {
+  font-size: 10px;
+  min-width: 42px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.image-viewer-hint {
+  position: absolute;
+  left: 50%;
+  bottom: 10px;
+  transform: translateX(-50%);
+  font-size: 10px;
+  color: var(--text-muted);
+  background: rgba(23, 26, 29, 0.7);
+  border-radius: 10px;
+  padding: 2px 10px;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+@media (max-width: 700px) {
+  .image-viewer-hint {
+    display: none;
+  }
+}
