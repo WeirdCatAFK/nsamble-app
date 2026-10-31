@@ -336,6 +336,12 @@ details[open] > .activity-header::before {
   cursor: pointer;
   outline: none;
   font-family: inherit;
+  max-width: 220px;
+}
+
+.chat-model-select:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 
 .chat-input {
@@ -351,6 +357,7 @@ details[open] > .activity-header::before {
   max-height: 160px;
   font-family: inherit;
   line-height: 1.5;
+  overflow-y: hidden;
 }
 
 .chat-input::placeholder {

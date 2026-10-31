@@ -1,6 +1,9 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { marked } from "marked";
 import { projects, conversations, models, files as filesApi, toAttachmentRefs } from "../api/client";
+import { canStartSession, resolveModelSlug } from "../utils/model-select.js";
+import { applyTextareaGrowth } from "../utils/textarea.js";
+import ModelSelector from "./ModelSelector";
 import "./Chat.css";
 
 marked.setOptions({ breaks: true, gfm: true });
@@ -228,22 +231,40 @@ export default function Chat({ projectId, onProjectCreated, onFilesUpdated, user
   const [liveCalls, setLiveCalls] = useState([]);
   const [availableModels, setAvailableModels] = useState([]);
   const [modelSlug, setModelSlug] = useState("");
+  const [modelsLoading, setModelsLoading] = useState(true);
+  const [modelsError, setModelsError] = useState(null);
   const [pending, setPending] = useState([]);
   const namedRef = useRef(false);
   const bottomRef = useRef(null);
   const abortRef = useRef(null);
   const attachRef = useRef(null);
+  const inputRef = useRef(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, status, liveCalls]);
 
   useEffect(() => {
-    models.list().then((list) => {
+    applyTextareaGrowth(inputRef.current);
+  }, [input]);
+
+  const loadModels = useCallback(async () => {
+    setModelsLoading(true);
+    setModelsError(null);
+    try {
+      const list = await models.list();
       setAvailableModels(list);
-      if (list.length && !modelSlug) setModelSlug(list[0].slug);
-    }).catch(() => {});
+      setModelSlug((prev) => resolveModelSlug({ currentSlug: prev, models: list }));
+    } catch (error) {
+      setModelsError(error);
+    } finally {
+      setModelsLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    loadModels();
+  }, [loadModels]);
 
   useEffect(() => {
     if (!projectId) return;
@@ -317,10 +338,24 @@ export default function Chat({ projectId, onProjectCreated, onFilesUpdated, user
 
   const ensureSession = useCallback(async (pid) => {
     if (sessionId) return sessionId;
-    const session = await conversations.start(pid, modelSlug);
+    let slug = resolveModelSlug({ currentSlug: modelSlug, models: availableModels });
+    if (!slug) {
+      try {
+        const list = await models.list();
+        setAvailableModels(list);
+        slug = resolveModelSlug({ currentSlug: "", models: list });
+        if (slug) setModelSlug(slug);
+      } catch {
+        slug = "";
+      }
+    }
+    if (!slug) {
+      throw new Error("No model is available. Select a model before sending.");
+    }
+    const session = await conversations.start(pid, slug);
     setSessionId(session.id);
     return session.id;
-  }, [sessionId, modelSlug]);
+  }, [sessionId, modelSlug, availableModels]);
 
   const refreshFiles = useCallback(async (pid) => {
     try {
@@ -516,6 +551,11 @@ export default function Chat({ projectId, onProjectCreated, onFilesUpdated, user
     }
   };
 
+  const modelReady = canStartSession({
+    sessionId,
+    modelSlug: resolveModelSlug({ currentSlug: modelSlug, models: availableModels }),
+  });
+
   return (
     <>
       <div className="panel-header">
@@ -605,6 +645,7 @@ export default function Chat({ projectId, onProjectCreated, onFilesUpdated, user
             </div>
           )}
           <textarea
+            ref={inputRef}
             className="chat-input"
             value={input}
             onChange={(e) => setInput(e.target.value)}
@@ -633,22 +674,26 @@ export default function Chat({ projectId, onProjectCreated, onFilesUpdated, user
                 onChange={pickImages}
                 disabled={sending}
               />
-              {availableModels.length > 1 && !sessionId && (
-                <select
-                  className="chat-model-select"
-                  value={modelSlug}
-                  onChange={(e) => setModelSlug(e.target.value)}
-                >
-                  {availableModels.map((m) => (
-                    <option key={m.slug} value={m.slug}>{m.slug}</option>
-                  ))}
-                </select>
-              )}
+              <ModelSelector
+                models={availableModels}
+                modelSlug={modelSlug}
+                onChange={setModelSlug}
+                disabled={sending}
+                loading={modelsLoading}
+                error={modelsError}
+                onRetry={loadModels}
+                locked={!!sessionId}
+              />
             </div>
             {sending ? (
               <button className="chat-stop" onClick={stop} title="Stop">&#x25A0;</button>
             ) : (
-              <button className="chat-send" onClick={send} disabled={!input.trim() && pending.length === 0} title="Send">
+              <button
+                className="chat-send"
+                onClick={send}
+                disabled={(!input.trim() && pending.length === 0) || !modelReady}
+                title={modelReady ? "Send" : "Select a model to send"}
+              >
                 &uarr;
               </button>
             )}
