@@ -104,6 +104,12 @@
   flex-shrink: 0;
 }
 
+.file-time {
+  font-size: 11px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
 .file-download {
   flex-shrink: 0;
   color: var(--text-muted);

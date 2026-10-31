@@ -1,5 +1,6 @@
 import { useState, useRef } from "react";
 import { files as filesApi } from "../api/client";
+import { ext, buildTree, groupByStem, formatSize, formatTime } from "../utils/file-tree.js";
 import "./FileTree.css";
 
 const ICONS = {
@@ -18,46 +19,6 @@ const ICONS = {
   default: "&#x25A1;",
 };
 
-function ext(filename) {
-  if (!filename) return "";
-  const dot = filename.lastIndexOf(".");
-  return dot > -1 ? filename.slice(dot + 1).toLowerCase() : "";
-}
-
-function formatSize(bytes) {
-  if (!bytes) return "";
-  if (bytes < 1024) return bytes + " B";
-  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
-  return (bytes / (1024 * 1024)).toFixed(1) + " MB";
-}
-
-function splitPath(name) {
-  const parts = (name || "").split("/").filter(Boolean);
-  if (parts.length <= 1) return { folders: [], base: name || "" };
-  return { folders: parts.slice(0, -1), base: parts[parts.length - 1] };
-}
-
-function buildTree(files) {
-  const root = { folders: new Map(), files: [] };
-  for (const file of files) {
-    const { folders, base } = splitPath(file.name);
-    let node = root;
-    for (const part of folders) {
-      if (!node.folders.has(part)) {
-        node.folders.set(part, { folders: new Map(), files: [] });
-      }
-      node = node.folders.get(part);
-    }
-    node.files.push({ ...file, base });
-  }
-  const sortNode = (node) => {
-    node.files.sort((a, b) => a.base.localeCompare(b.base));
-    for (const child of node.folders.values()) sortNode(child);
-  };
-  sortNode(root);
-  return root;
-}
-
 function FileRow({ file, projectId, active, onSelect }) {
   return (
     <button
@@ -72,6 +33,7 @@ function FileRow({ file, projectId, active, onSelect }) {
         }}
       />
       <span className="file-name">{file.base ?? file.name}</span>
+      <span className="file-time" title={file.createdAt || ""}>{formatTime(file.createdAt)}</span>
       <span className="file-size">{formatSize(file.size)}</span>
       <span
         className="file-download"
@@ -91,6 +53,23 @@ function FileRow({ file, projectId, active, onSelect }) {
         &#x21E3;
       </span>
     </button>
+  );
+}
+
+function StemGroup({ stem, files, projectId, activeFileId, onSelect }) {
+  return (
+    <div className="file-group">
+      <div className="file-group-label">{stem}</div>
+      {files.map((file) => (
+        <FileRow
+          key={file.id}
+          file={file}
+          projectId={projectId}
+          active={file.id === activeFileId}
+          onSelect={onSelect}
+        />
+      ))}
+    </div>
   );
 }
 
@@ -128,12 +107,13 @@ function FolderNode({ name, node, depth, projectId, activeFileId, onSelect }) {
               />
             ))}
           <div style={{ paddingLeft: (depth + 1) * 12 }}>
-            {node.files.map((file) => (
-              <FileRow
-                key={file.id}
-                file={file}
+            {groupByStem(node.files).map((group) => (
+              <StemGroup
+                key={group.stem.toLowerCase()}
+                stem={group.stem}
+                files={group.files}
                 projectId={projectId}
-                active={file.id === activeFileId}
+                activeFileId={activeFileId}
                 onSelect={onSelect}
               />
             ))}
@@ -165,12 +145,6 @@ export default function FileTree({ files, onSelect, activeFileId, projectId, onF
   };
 
   const tree = buildTree(files);
-  const loose = {};
-  for (const file of tree.files) {
-    const e = ext(file.base) || "other";
-    if (!loose[e]) loose[e] = [];
-    loose[e].push(file);
-  }
 
   return (
     <>
@@ -213,19 +187,15 @@ export default function FileTree({ files, onSelect, activeFileId, projectId, onF
               onSelect={onSelect}
             />
           ))}
-        {Object.entries(loose).map(([type, group]) => (
-          <div key={type} className="file-group">
-            <div className="file-group-label">{type.toUpperCase()}</div>
-            {group.map((file) => (
-              <FileRow
-                key={file.id}
-                file={file}
-                projectId={projectId}
-                active={file.id === activeFileId}
-                onSelect={onSelect}
-              />
-            ))}
-          </div>
+        {groupByStem(tree.files).map((group) => (
+          <StemGroup
+            key={group.stem.toLowerCase()}
+            stem={group.stem}
+            files={group.files}
+            projectId={projectId}
+            activeFileId={activeFileId}
+            onSelect={onSelect}
+          />
         ))}
       </div>
     </>
