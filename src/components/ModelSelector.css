@@ -1,0 +1,45 @@
+.model-select-locked {
+  font-size: 12px;
+  color: var(--text-muted);
+  padding: 4px;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.model-select-error {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--error-text);
+  padding: 4px;
+}
+
+.model-select-retry {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-secondary);
+  padding: 2px 8px;
+  font-size: 12px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.model-select-retry:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--text-primary);
+}
+
+.model-select-retry:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.model-select-empty {
+  font-size: 12px;
+  color: var(--text-muted);
+  padding: 4px;
+}
