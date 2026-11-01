@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, lazy, Suspense } from "react";
 import { auth, setToken, projects, conversations, files as filesApi, machines as machinesApi, users as usersApi } from "../api/client";
 import { templates } from "../data/templates";
 import { MACHINE_TYPES } from "../utils/machines";
@@ -7,62 +7,7 @@ import "./Homepage.css";
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
-function HeroArt() {
-  return (
-    <svg className="hero-art" viewBox="0 0 1200 420" preserveAspectRatio="xMidYMid slice" aria-hidden="true" focusable="false">
-      <defs>
-        <pattern id="hero-grid" width="40" height="40" patternUnits="userSpaceOnUse">
-          <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#2E3439" strokeWidth="1" />
-        </pattern>
-        <pattern id="hero-grid-major" width="200" height="200" patternUnits="userSpaceOnUse">
-          <path d="M 200 0 L 0 0 0 200" fill="none" stroke="#3A4147" strokeWidth="1" />
-        </pattern>
-      </defs>
-      <rect width="1200" height="420" fill="url(#hero-grid)" />
-      <rect width="1200" height="420" fill="url(#hero-grid-major)" />
-      <g stroke="#A6A78F" strokeWidth="1.5" fill="none" opacity="0.55">
-        <polygon points="180,100 274,154 274,262 180,316 86,262 86,154" />
-        <polygon points="180,140 240,175 240,245 180,280 120,245 120,175" opacity="0.6" />
-      </g>
-      <g className="hero-spin" stroke="#858B91" strokeWidth="1" fill="none" opacity="0.7" strokeDasharray="4 8">
-        <circle cx="180" cy="208" r="140" />
-      </g>
-      <g stroke="#BB792A" strokeWidth="1.5" opacity="0.9">
-        <line x1="162" y1="208" x2="198" y2="208" />
-        <line x1="180" y1="190" x2="180" y2="226" />
-      </g>
-      <circle cx="180" cy="208" r="4" fill="#BB792A" />
-      <g stroke="#3A4147" strokeWidth="1.5" fill="none">
-        <circle cx="1020" cy="200" r="120" />
-        <circle cx="1020" cy="200" r="90" />
-      </g>
-      <circle cx="1020" cy="200" r="58" fill="none" stroke="#A6A78F" strokeWidth="1.5" opacity="0.55" />
-      <g stroke="#BB792A" strokeWidth="1.5" opacity="0.9">
-        <line x1="880" y1="336" x2="1160" y2="336" />
-        <line x1="880" y1="328" x2="880" y2="344" />
-        <line x1="1160" y1="328" x2="1160" y2="344" />
-      </g>
-      <text x="1020" y="362" textAnchor="middle" fontSize="13" fill="#A6A78F" fontFamily="monospace">280</text>
-      <g stroke="#858B91" strokeWidth="1.5" opacity="0.7">
-        <line x1="56" y1="80" x2="56" y2="340" />
-        <line x1="48" y1="80" x2="64" y2="80" />
-        <line x1="48" y1="340" x2="64" y2="340" />
-      </g>
-      <text x="34" y="214" textAnchor="middle" fontSize="12" fill="#858B91" fontFamily="monospace" transform="rotate(-90 34 214)">260</text>
-      <g fill="#BB792A" opacity="0.85">
-        <circle cx="420" cy="120" r="3" />
-        <circle cx="790" cy="300" r="3" />
-        <circle cx="640" cy="90" r="2.5" />
-      </g>
-      <g stroke="#3A4147" strokeWidth="1.5" opacity="0.9">
-        <line x1="540" y1="320" x2="560" y2="320" />
-        <line x1="550" y1="310" x2="550" y2="330" />
-        <line x1="700" y1="130" x2="720" y2="130" />
-        <line x1="710" y1="120" x2="710" y2="140" />
-      </g>
-    </svg>
-  );
-}
+const HeroScene = lazy(() => import("./HeroScene.jsx"));
 
 function TemplateCard({ template, onClick }) {
   return (
@@ -466,7 +411,7 @@ function WorkshopSection() {
   };
 
   return (
-    <section className="homepage-section">
+    <section className="homepage-section" id="workshop">
       <h2 className="section-title">Your workshop</h2>
       <p className="workshop-hint">Machines and materials the agent assumes for every project.</p>
       {machines.length > 0 && (
@@ -549,7 +494,16 @@ export default function Homepage({ user, onAuth, onLogout, onOpenProject }) {
   const [selectedTemplate, setSelectedTemplate] = useState(null);
   const [showAuth, setShowAuth] = useState(false);
   const [projectQuery, setProjectQuery] = useState("");
+  const [heroBuildId, setHeroBuildId] = useState("rpi-case");
+  const pendingGuideRef = useRef(false);
   const carouselRef = useRef(null);
+  const heroBuild = templates.find((t) => t.id === heroBuildId) || templates[0];
+
+  useEffect(() => {
+    if (!user || !pendingGuideRef.current) return;
+    pendingGuideRef.current = false;
+    document.getElementById("start")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [user]);
 
   const filteredProjects = userProjects.filter((p) =>
     p.name?.toLowerCase().includes(projectQuery.trim().toLowerCase()),
@@ -602,6 +556,12 @@ export default function Homepage({ user, onAuth, onLogout, onOpenProject }) {
     <div className="homepage">
       <nav className="homepage-nav">
         <span className="homepage-logo">nsamble</span>
+        <div className="homepage-nav-links">
+          <a href="#start">Start</a>
+          {user && <a href="#workshop">Workshop</a>}
+          {user && <a href="#projects">Projects</a>}
+          <a href="#templates">Templates</a>
+        </div>
         {user ? (
           <div className="homepage-nav-right">
             <span className="homepage-user">{user.name || user.email}</span>
@@ -613,32 +573,68 @@ export default function Homepage({ user, onAuth, onLogout, onOpenProject }) {
       </nav>
 
       <header className="homepage-hero">
-        <HeroArt />
-        <h1 className="homepage-title">Natural-language manufacturing</h1>
-        <p className="homepage-subtitle">
-          Describe parts and assemblies in plain language.
-          Get parametric CAD files, 3D previews, and cost reports.
-        </p>
-        {user && (
-          <div className="homepage-actions">
-            <button className="action-btn action-primary" onClick={handleNewProject}>
-              New project
-            </button>
-            <button className="action-btn" onClick={() => {
-              const last = userProjects[0];
-              if (last) onOpenProject(last);
-              else handleNewProject();
-            }}>
-              Continue last
-            </button>
-          </div>
-        )}
+        <span className="hero-corner hero-corner-tl" aria-hidden="true" />
+        <span className="hero-corner hero-corner-tr" aria-hidden="true" />
+        <span className="hero-corner hero-corner-bl" aria-hidden="true" />
+        <span className="hero-corner hero-corner-br" aria-hidden="true" />
+        <h1 className="homepage-title">
+          <span className="hero-line">Natural-language</span>
+          <span className="hero-line hero-line-sage">manufacturing</span>
+        </h1>
+        <div className="hero-stage">
+          <Suspense fallback={<div className="hero-stage-fallback">Loading model...</div>}>
+            <HeroScene />
+          </Suspense>
+        </div>
+        <div className="hero-bottom">
+          <p className="homepage-subtitle">
+            Describe parts and assemblies in plain language.
+            Get parametric CAD files, 3D previews, and cost reports.
+            Drag the model to inspect an assembly from every side.
+          </p>
+          <div className="hero-ruler" aria-hidden="true"><span className="hero-ruler-caret">&#9662;</span></div>
+          <a className="hero-scroll-hint" href="#start">Start building &#9662;</a>
+        </div>
       </header>
+
+      <section className="hero-menu" id="start" aria-label="Start a build">
+        <div className="hero-ruler hero-menu-ruler" aria-hidden="true"><span className="hero-ruler-caret">&#9662;</span></div>
+          <div className="hero-menu-inner">
+            <div className="hero-build-meta" aria-live="polite">
+              <span className="hero-build-name">{heroBuild.name}</span>
+              <span className="hero-build-desc">{heroBuild.description}</span>
+              <span className="hero-build-files">{heroBuild.files.join("  /  ")}</span>
+              <span className="hero-build-credit">Case shown: Raspberry Pi 4 case, Google Coral mechanicals.</span>
+              <span className="hero-menu-hint">{user ? "Pick a template, start a new project, or continue the last one. Your workshop, projects and files are below." : "Pick a template to see what it builds. Sign in when you are ready to start."}</span>
+            </div>
+            <div className="hero-builds" role="tablist" aria-label="Things you can build">
+              {templates.map((t) => (
+                <button key={t.id} type="button" role="tab" aria-selected={t.id === heroBuild.id}
+                  className={t.id === heroBuild.id ? "hero-chip hero-chip-active" : "hero-chip"}
+                  onClick={() => setHeroBuildId(t.id)}>{t.name}</button>
+              ))}
+            </div>
+            <div className="homepage-actions">
+              <button className="action-btn hero-use-template" type="button"
+                onClick={() => (user ? setSelectedTemplate(heroBuild) : setShowAuth(true))}>
+                Use this template
+              </button>
+              {user ? (
+                <>
+                  <button className="action-btn action-primary" onClick={handleNewProject}>New project</button>
+                  <button className="action-btn" onClick={() => { const last = userProjects[0]; if (last) onOpenProject(last); else handleNewProject(); }}>Continue last</button>
+                </>
+              ) : (
+                <button className="action-btn action-primary" onClick={() => setShowAuth(true)}>Sign in to build</button>
+              )}
+            </div>
+          </div>
+      </section>
 
       {user && <WorkshopSection />}
 
-      {user && userProjects.length > 0 && (
-        <section className="homepage-section">
+      {user && (
+        <section className="homepage-section" id="projects">
           <div className="projects-toolbar">
             <h2 className="section-title">Your projects</h2>
             <input
@@ -650,7 +646,9 @@ export default function Homepage({ user, onAuth, onLogout, onOpenProject }) {
             />
           </div>
           <div className="projects-list">
-            {filteredProjects.length === 0 && (
+            {userProjects.length === 0 ? (
+              <div className="projects-empty">No projects yet. Use the menu above to start a new project or pick a template — it will appear here.</div>
+            ) : filteredProjects.length === 0 && (
               <div className="projects-empty">No projects match your search.</div>
             )}
             {filteredProjects.map((p) => (
@@ -667,7 +665,7 @@ export default function Homepage({ user, onAuth, onLogout, onOpenProject }) {
       )}
 
       {user && userFiles.length > 0 && (
-        <section className="homepage-section">
+        <section className="homepage-section" id="files">
           <h2 className="section-title">Your files</h2>
           <div className="projects-list">
             {userFiles.map((f) => (
@@ -682,7 +680,7 @@ export default function Homepage({ user, onAuth, onLogout, onOpenProject }) {
         </section>
       )}
 
-      <section className="homepage-section">
+      <section className="homepage-section" id="templates">
         <h2 className="section-title">Templates</h2>
         <div className="carousel-wrapper">
           <button className="carousel-arrow carousel-left" onClick={() => scrollCarousel(-1)}>
@@ -706,7 +704,7 @@ export default function Homepage({ user, onAuth, onLogout, onOpenProject }) {
       {showAuth && !user && (
         <div className="modal-overlay" onClick={() => setShowAuth(false)}>
           <div onClick={(e) => e.stopPropagation()}>
-            <AuthSection onAuth={(u) => { setShowAuth(false); onAuth(u); }} />
+            <AuthSection onAuth={(u) => { pendingGuideRef.current = true; setShowAuth(false); onAuth(u); }} />
           </div>
         </div>
       )}
